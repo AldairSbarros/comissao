@@ -1,0 +1,66 @@
+# =adia
+# ==========================================
+# GERAL
+# ==========================================
+# Arquivos de sistema operacional e de IDEs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# ==========================================
+# BACKEND (Python/FastAPI)
+# ==========================================
+# Ambientes Virtuais
+.venv/
+venv/
+env/
+financeiro-backend/.venv/
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+financeiro-backend/__pycache__/
+
+# Cache do Pytest
+.pytest_cache/
+financeiro-backend/.pytest_cache/
+# Banco de Dados SQLite (IMPORTANTE)
+# Ignora QUALQUER arquivo .db. Isso evita que você envie acidentalmente
+# seu banco de dados de desenvolvimento local (financeiro.db, test.db) para o repositório.
+# O banco de produção no VPS deve ser criado e mantido lá.
+*.db
+*.db-journal
+# ==========================================
+# FRONTEND (Node.js/Next.js)
+# ==========================================
+# Dependências do Node
+node_modules/
+financeiro-frontend/node_modules/
+
+# Arquivos de build e cache do Next.js
+.next/
+financeiro-frontend/.next/
+out/
+build/
+
+# Logs e relatórios
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lint-staged.log*
+coverage/
+
+# Variáveis de Ambiente Locais (IMPORTANTE)
+# Nunca envie chaves de API, senhas ou segredos para o repositório.
+.env
+.env.*
+!.env.example
+
+financeiro-frontend/.env.local
+financeiro-frontend/.env.development.local
+financeiro-frontend/.env.test.local
+financeiro-frontend/.env.production.local
