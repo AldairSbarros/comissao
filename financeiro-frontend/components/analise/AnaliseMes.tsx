@@ -12,7 +12,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { getAnalises } from "@/lib/api";
+import { getAnalisesMes } from "@/lib/api";
 import { AnaliseMes, SemanaResumo, RendaItemResumo, MetodoPagamentoResumo } from "@/lib/types";
 
 interface AnaliseMesProps {
