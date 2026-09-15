@@ -1,7 +1,7 @@
 # Dockerfile (para o Frontend - Next.js)
 
 # 1. Estágio de Build
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copia os arquivos de dependência e instala
@@ -15,7 +15,7 @@ COPY . .
 RUN npm run build
 
 # 2. Estágio de Produção
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Define o ambiente como produção
