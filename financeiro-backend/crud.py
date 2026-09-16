@@ -75,10 +75,10 @@ def update_area_eclesiastica(db: Session, area_id: int, area: schemas.AreaEclesi
     if db_area:
         update_data = area.model_dump(exclude_unset=True)
         for key, value in update_data.items():
-            setattr(db_area, key, value)
-        db.add(db_area)
+                    setattr(db_area, key, value)
+    db.add(db_area)
     db.commit()
-        db.refresh(db_area)
+    db.refresh(db_area)
     return db_area
 
 def delete_area_eclesiastica(db: Session, area_id: int):
