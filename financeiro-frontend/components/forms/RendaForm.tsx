@@ -59,7 +59,7 @@ export function RendaForm({ onSubmit, isLoading, dizimistas, dataInicioSemana, d
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="tipo">Tipo de Renda *</Label>
-          <Select onValueChange={(val) => setValue("tipo", val, { shouldValidate: true })} value={tipoValue}>
+          <Select           onValueChange={(val) => setValue("tipo", val || "", { shouldValidate: true })} value={tipoValue}>
             <SelectTrigger>
               <SelectValue placeholder="Selecione o tipo" />
             </SelectTrigger>
@@ -106,7 +106,7 @@ export function RendaForm({ onSubmit, isLoading, dizimistas, dataInicioSemana, d
 
         <div className="space-y-2">
           <Label htmlFor="metodo_pagamento">Método de Pagamento *</Label>
-          <Select onValueChange={(val) => setValue("metodo_pagamento", val, { shouldValidate: true })} value={metodoPagamentoValue}>
+          <Select           onValueChange={(val) => setValue("metodo_pagamento", val || "", { shouldValidate: true })} value={metodoPagamentoValue}>
             <SelectTrigger>
               <SelectValue placeholder="Selecione" />
             </SelectTrigger>

@@ -1,18 +1,19 @@
-// financeiro-frontend/hooks/useAuth.ts
+// financeiro-frontend/hooks/useAuth.tsx
+"use client";
+
 import { useState, useEffect, useContext, createContext, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api'; // Certifique-se de que o caminho está correto
-import { jwtDecode } from 'jwt-decode'; // Instale: npm install jwt-decode
+import { api } from '@/lib/api';
+import { jwtDecode } from 'jwt-decode';
 
-// Defina a interface para o objeto de usuário autenticado
-interface AuthUser {
-  email: string;
+// Definição da interface para o usuário extraído do token JWT
+export interface AuthUser {
+  sub: string; // O e-mail do usuário
   funcao: string;
-  is_superuser: boolean; // Adicionado para identificar o superusuário
+  is_superuser: boolean;
   denominacao_id?: number;
   area_id?: number;
   congregacao_id?: number;
-  // Adicione outros campos do payload do token conforme necessário
 }
 
 interface AuthContextType {
@@ -32,17 +33,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const loadUserFromLocalStorage = useCallback(() => {
+    setLoading(true);
     try {
       const storedToken = localStorage.getItem('access_token');
       if (storedToken) {
-        const decodedUser: AuthUser = jwtDecode(storedToken);
+        const decodedUser = jwtDecode<AuthUser>(storedToken);
         setToken(storedToken);
         setUser(decodedUser);
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
       }
     } catch (error) {
-      console.error('Erro ao decodificar token do localStorage:', error);
-      localStorage.removeItem('access_token'); // Limpa token inválido
+      console.error('Token inválido ou expirado, limpando localStorage:', error);
+      localStorage.removeItem('access_token');
     } finally {
       setLoading(false);
     }
@@ -52,19 +54,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUserFromLocalStorage();
   }, [loadUserFromLocalStorage]);
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email: string, password: string) => {
     setLoading(true);
+    const params = new URLSearchParams();
+    params.append('username', email);
+    params.append('password', password);
+    
     try {
-      const response = await api.post('/token', new URLSearchParams({ username: email, password: password }));
+      const response = await api.post('/token', params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      
       const accessToken = response.data.access_token;
+      
       localStorage.setItem('access_token', accessToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
-
-      const decodedUser: AuthUser = jwtDecode(accessToken);
+      
+      const decodedUser = jwtDecode<AuthUser>(accessToken);
       setToken(accessToken);
       setUser(decodedUser);
 
-      // Redirecionamento baseado na função (novo: is_superuser)
       if (decodedUser.is_superuser) {
         router.push('/superuser-dashboard');
       } else {
@@ -73,7 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     } catch (error) {
       console.error('Erro no login:', error);
-      logout(); // Garante que o estado de autenticação seja limpo em caso de erro
       throw error;
     } finally {
       setLoading(false);
@@ -85,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     delete api.defaults.headers.common['Authorization'];
     setUser(null);
     setToken(null);
-    router.push('/'); // Redireciona para a página de login
+    router.push('/');
   }, [router]);
 
   return (

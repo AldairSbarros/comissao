@@ -81,7 +81,7 @@ export default function AreaForm({ onAreaCriada }: AreaFormProps) {
             <Label htmlFor="denominacao" className="text-slate-300">Denominação</Label>
             <Select
               value={denominacaoId}
-              onValueChange={setDenominacaoId}
+              onValueChange={(val) => setDenominacaoId(val || "")}
               disabled={isLoading || isLoadingDenominacoes}
             >
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 focus:ring-emerald-500">
@@ -102,7 +102,7 @@ export default function AreaForm({ onAreaCriada }: AreaFormProps) {
             <Label htmlFor="tipoArea" className="text-slate-300">Tipo</Label>
             <Select
               value={tipoArea}
-              onValueChange={setTipoArea}
+              onValueChange={(val) => setTipoArea(val || "")}
               disabled={isLoading}
             >
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 focus:ring-emerald-500">

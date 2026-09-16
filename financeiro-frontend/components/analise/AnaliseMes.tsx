@@ -1,197 +1,142 @@
-import React, { useEffect, useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import { getAnalisesMes } from "@/lib/api";
-import { AnaliseMes, SemanaResumo, RendaItemResumo, MetodoPagamentoResumo } from "@/lib/types";
+// financeiro-frontend/components/analise/AnaliseMes.tsx
+"use client";
+
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import { AnaliseMes as AnaliseMesType } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 interface AnaliseMesProps {
   mesId: number;
 }
 
-/** Cores padrão para os gráficos de pizza */
-const PIE_COLORS = [
-  "#8884d8",
-  "#82ca9d",
-  "#ffc658",
-  "#ff8042",
-  "#8dd1e1",
-  "#a4de6c",
-  "#d0ed57",
-  "#ffc0cb",
-];
+const COLORS = ["#10b981", "#3b82f6", "#f97316", "#ef4444", "#8b5cf6"];
 
-export const AnaliseMes: React.FC<AnaliseMesProps> = ({ mesId }) => {
-  const [analise, setAnalise] = useState<AnaliseMes | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+export default function AnaliseMes({ mesId }: AnaliseMesProps) {
+  const [analise, setAnalise] = useState<AnaliseMesType | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await getAnalises(mesId);
-        setAnalise(data);
-      } catch (e: any) {
-        setError(e.message ?? "Erro ao carregar análise");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    if (mesId) {
+      const fetchAnalise = async () => {
+        setLoading(true);
+        try {
+          const response = await api.get<AnaliseMesType>(`/meses/${mesId}/analises`);
+          setAnalise(response.data);
+        } catch (error) {
+          toast.error("Erro ao carregar análise do mês.");
+          console.error(error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchAnalise();
+    }
   }, [mesId]);
 
-  if (loading) return <p>Carregando análise...</p>;
-  if (error) return <p className="text-red-500">{error}</p>;
-  if (!analise) return null;
+  if (loading) {
+    return <div className="text-center text-slate-400">Carregando análise...</div>;
+  }
 
-  const {
-    nome_mes,
-    series_entradas_saida,
-    principais_rendas,
-    resumo_pagamentos,
-    totais,
-  } = analise;
+  if (!analise) {
+    return <div className="text-center text-slate-400">Não foi possível carregar os dados para análise.</div>;
+  }
+  
+  const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-  /* ---------- Gráficos ---------- */
-  const renderBarChart = () => (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={series_entradas_saida} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-        <XAxis dataKey="label" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="entradas" fill="#82ca9d" name="Entradas" />
-        <Bar dataKey="saidas" fill="#ff8042" name="Despesas" />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-
-  const renderRendaPie = () => (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie
-          data={principais_rendas}
-          dataKey="total"
-          nameKey="tipo"
-          cx="50%"
-          cy="50%"
-          outerRadius={100}
-          label={({ percent, nome }) => `${nome} ${(percent * 100).toFixed(0)}%`}
-        >
-          {principais_rendas.map((_, idx) => (
-            <Cell key={`cell-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-
-  const renderMetodoPagamentoPie = () => (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie
-          data={resumo_pagamentos}
-          dataKey="total"
-          nameKey="metodo_pagamento"
-          cx="50%"
-          cy="50%"
-          outerRadius={100}
-          label={({ percent, nome }) => `${nome} ${(percent * 100).toFixed(0)}%`}
-        >
-          {resumo_pagamentos.map((_, idx) => (
-            <Cell key={`cell-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-
-  /* ---------- Cards de Totais ---------- */
-  const renderTotais = () => (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Saldo Inicial</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xl font-bold">R$ {totais.saldo_inicial.toFixed(2)}</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Entradas Brutas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xl font-bold">R$ {totais.entradas_brutas.toFixed(2)}</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Despesas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xl font-bold">R$ {totais.despesas.toFixed(2)}</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Saldo Final</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className={`text-xl font-bold ${totais.saldo_final >= 0 ? "text-green-600" : "text-red-600"}`}>
-            R$ {totais.saldo_final.toFixed(2)}
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    return (
+      <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+        {`${name} (${(percent * 100).toFixed(0)}%)`}
+      </text>
+    );
+  };
 
   return (
-    <section className="p-4">
-      <h2 className="text-2xl font-bold mb-4">{nome_mes} – Análise Completa</h2>
-
-      {/* Totais */}
-      {renderTotais()}
-
-      {/* Gráfico de Barras – Entradas vs Despesas por Semana */}
-      <Card className="mb-6">
+    <div className="space-y-6">
+      <Card className="bg-slate-900/50 border-slate-800 text-white">
         <CardHeader>
-          <CardTitle>Entradas × Despesas por Semana</CardTitle>
-          <CardDescription>Comparativo semanal</CardDescription>
+          <CardTitle>Entradas vs. Saídas</CardTitle>
         </CardHeader>
-        <CardContent>{renderBarChart()}</CardContent>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={analise.series_entradas_saida}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+              <XAxis dataKey="label" stroke="#cbd5e1" />
+              <YAxis stroke="#cbd5e1" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} 
+                formatter={(value: any) => formatCurrency(value)}
+              />
+              <Bar dataKey="entradas" fill="#10b981" name="Entradas" />
+              <Bar dataKey="saidas" fill="#ef4444" name="Saídas" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
       </Card>
 
-      {/* Gráficos de Pizza – Rendas por Tipo & Métodos de Pagamento */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Principais Rendas (por Tipo)</CardTitle>
-          </CardHeader>
-          <CardContent>{renderRendaPie()}</CardContent>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card className="bg-slate-900/50 border-slate-800 text-white">
+            <CardHeader>
+                <CardTitle>Distribuição por Tipo de Renda</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                    data={analise.principais_rendas}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={renderCustomizedLabel}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="total"
+                    nameKey="tipo"
+                    >
+                    {analise.principais_rendas.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                    </Pie>
+                    <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                </PieChart>
+                </ResponsiveContainer>
+            </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumo por Método de Pagamento</CardTitle>
-          </CardHeader>
-          <CardContent>{renderMetodoPagamentoPie()}</CardContent>
+        <Card className="bg-slate-900/50 border-slate-800 text-white">
+            <CardHeader>
+                <CardTitle>Distribuição por Método de Pagamento</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                    data={analise.resumo_pagamentos}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={renderCustomizedLabel}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="total"
+                    nameKey="metodo_pagamento"
+                    >
+                    {analise.resumo_pagamentos.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                    </Pie>
+                    <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                </PieChart>
+                </ResponsiveContainer>
+            </CardContent>
         </Card>
       </div>
-    </section>
+    </div>
   );
-};
+}

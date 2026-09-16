@@ -107,7 +107,7 @@ export default function CongregacaoForm({ onCongregacaoCriada }: CongregacaoForm
             <Label htmlFor="denominacao" className="text-slate-300">Denominação</Label>
             <Select
               value={denominacaoId}
-              onValueChange={setDenominacaoId}
+              onValueChange={(val) => setDenominacaoId(val || "")}
               disabled={isLoading || isLoadingDenominacoes}
             >
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 focus:ring-emerald-500">
@@ -128,7 +128,7 @@ export default function CongregacaoForm({ onCongregacaoCriada }: CongregacaoForm
             <Label htmlFor="area" className="text-slate-300">Área/Zona/Distrito (Opcional)</Label>
             <Select
               value={areaId}
-              onValueChange={setAreaId}
+              onValueChange={(val) => setAreaId(val || "")}
               disabled={isLoading || isLoadingAreas || !denominacaoId} // Desabilita se não houver denominação ou estiver carregando
             >
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 focus:ring-emerald-500">

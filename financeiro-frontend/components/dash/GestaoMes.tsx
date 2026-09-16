@@ -31,7 +31,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 // Nova importação do componente de análise de mês
-import { AnaliseMes } from "@/components/analise/AnaliseMes";
+import  AnaliseMes  from "@/components/analise/AnaliseMes";
 
 export default function GestaoMes() {
   const { user } = useAuth();
@@ -202,7 +202,7 @@ export default function GestaoMes() {
           ) : meses.length === 0 ? (
             <p>Nenhum mês financeiro foi criado ainda.</p>
           ) : (
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion className="w-full">
               {meses.map((mes) => (
                 <AccordionItem value={`mes-${mes.id}`} key={mes.id}>
                                     <AccordionTrigger>
@@ -267,8 +267,8 @@ export default function GestaoMes() {
                                   <div className="flex justify-between items-center mb-2 border-b pb-1">
                                     <h4 className="font-semibold text-sm">Rendas Lançadas</h4>
                                     {!mes.fechado && (
-                                      <Dialog>
-                                        <DialogTrigger asChild>
+                                                                            <Dialog>
+                                        <DialogTrigger>
                                           <Button variant="ghost" size="sm" className="h-8 px-2 text-xs"><PlusCircle className="h-3 w-3 mr-1"/> Nova</Button>
                                         </DialogTrigger>
         <DialogContent className="max-w-md">

@@ -144,7 +144,7 @@ export default function SuperuserDashboardPage() {
               <Tooltip 
                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} 
                 itemStyle={{ color: '#e2e8f0' }} 
-                formatter={(value: number) => `${value} tenants`}
+                formatter={(value: any) => `${value} tenants`}
               />
               <Bar dataKey="novosTenants" fill="#10b981" /> {/* emerald-500 */}
             </BarChart>

@@ -18,6 +18,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Cell,
 } from "recharts";
 import { Lock, Unlock, FileDown, TrendingUp, TrendingDown, DollarSign, Receipt } from "lucide-react";
 
@@ -168,7 +169,7 @@ export default function AnaliseMes({ mesId, nomeMes, fechado, saldoInicial, sald
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" tickFormatter={(value) => formatarMoeda(value)} />
                 <YAxis type="category" dataKey="label" width={50} />
-                <Tooltip formatter={(value: number) => formatarMoeda(value)} />
+                <Tooltip formatter={(value: any) => formatarMoeda(Number(value) || 0)} />
                 <Legend />
                 <Bar dataKey="Entradas" fill="#00C49F" radius={[0, 4, 4, 0]} />
                 <Bar dataKey="Saídas" fill="#FF8042" radius={[0, 4, 4, 0]} />
@@ -198,13 +199,13 @@ export default function AnaliseMes({ mesId, nomeMes, fechado, saldoInicial, sald
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    label={({ name, percent }: any) => percent !== undefined ? `${name} (${(percent * 100).toFixed(0)}%)` : name}
                   >
                     {dadosRendas.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => formatarMoeda(value)} />
+                  <Tooltip formatter={(value: any) => formatarMoeda(value)} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -231,13 +232,13 @@ export default function AnaliseMes({ mesId, nomeMes, fechado, saldoInicial, sald
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    label={({ name, percent }: any) => percent !== undefined ? `${name} (${(percent * 100).toFixed(0)}%)` : name}
                   >
                     {dadosPagamentos.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => formatarMoeda(value)} />
+                  <Tooltip formatter={(value: any) => formatarMoeda(value)} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
