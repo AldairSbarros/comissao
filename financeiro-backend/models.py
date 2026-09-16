@@ -110,7 +110,7 @@ class Despesa(Base):
     data_registro = Column(Date, nullable=True) # Adicionado data_registro na despesa
     # Novo campo: indica se a despesa deve ser gerada automaticamente nas próximas semanas
     recorrente = Column(Boolean, default=False, nullable=False)
-    # Periodicidade aceita: "semanal", "quinzenal", "mensal"
-        periodicidade = Column(String, nullable=True)
+        # Periodicidade aceita: "semanal", "quinzenal", "mensal"
+    periodicidade = Column(String, nullable=True)
     semana_id = Column(Integer, ForeignKey('semanas.id'))
     semana = relationship("Semana", back_populates="despesas")
