@@ -7,11 +7,11 @@ services:
     build:
       context: ./financeiro-backend
       dockerfile: Dockerfile # <-- CORREÇÃO: Remova o caminho da pasta aqui
-    restart: unless-stopped
+        restart: unless-stopped
     ports:
       - "8001:8000"
     volumes:
-      - ./financeiro_data:/app
+      - ./financeiro_data:/app/data
     networks:
       - financeiro_network
 
