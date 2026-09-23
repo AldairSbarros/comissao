@@ -217,6 +217,7 @@ class Usuario(UsuarioBase):
     id: int
     funcao: str
     is_superuser: bool
+    is_active: bool = True
     denominacao_id: Optional[int] = None
     denominacao: Optional[DenominacaoBase] = None
     area_id: Optional[int] = None
@@ -265,6 +266,20 @@ class MasterStats(BaseModel):
     crescimento_tenants_mensal: dict[str, int] # Ex: {"2024-01": 5, "2024-02": 8}
     ranking_tenants_ativos: List[TenantStats]
     tamanho_db_mb: float
+
+# --- Schemas de Gestão de Usuários e Tenants (Painel Master) ---
+
+class UserPasswordReset(BaseModel):
+    """Schema para reset de senha de um usuário pelo superuser."""
+    nova_senha: str = Field(min_length=1)
+
+class UserStatusUpdate(BaseModel):
+    """Schema para ativar/suspender um usuário pelo superuser."""
+    is_active: bool
+
+class TenantRename(BaseModel):
+    """Schema para renomear uma denominação (tenant) pelo superuser."""
+    nome: str = Field(min_length=1)
 
 
 

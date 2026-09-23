@@ -160,6 +160,47 @@ def create_user(db: Session, user: schemas.UsuarioCreate, *, commit: bool = True
         db.flush()
     return db_user
 
+def get_user_by_id(db: Session, user_id: int):
+    """Obtém um usuário pelo seu ID."""
+    return db.query(models.Usuario).filter(models.Usuario.id == user_id).first()
+
+def get_users(db: Session, denominacao_id: int = None, skip: int = 0, limit: int = 100):
+    """Lista usuários, opcionalmente filtrando por denominação (tenant)."""
+    query = db.query(models.Usuario)
+    if denominacao_id is not None:
+        query = query.filter(models.Usuario.denominacao_id == denominacao_id)
+    return query.offset(skip).limit(limit).all()
+
+def update_user_password(db: Session, user_id: int, nova_senha: str):
+    """Reseta a senha de um usuário (uso do superuser)."""
+    db_user = get_user_by_id(db, user_id)
+    if db_user:
+        db_user.hashed_password = security.get_password_hash(nova_senha)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def update_user_status(db: Session, user_id: int, is_active: bool):
+    """Ativa ou suspende um usuário (uso do superuser)."""
+    db_user = get_user_by_id(db, user_id)
+    if db_user:
+        db_user.is_active = is_active
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def update_denominacao_nome(db: Session, denominacao_id: int, nome: str):
+    """Renomeia uma denominação (uso do superuser)."""
+    db_denominacao = get_denominacao_by_id(db, denominacao_id)
+    if db_denominacao:
+        db_denominacao.nome = nome
+        db.add(db_denominacao)
+        db.commit()
+        db.refresh(db_denominacao)
+    return db_denominacao
+
 def initialize_setup(db: Session, payload: schemas.SetupPayload):
     """Cria o superusuario da plataforma (dono do sistema, sem tenant)."""
     try:

@@ -74,20 +74,37 @@ Esta é a ação principal do superusuário. Em uma única operação, o sistema
 1. No cartão **"Criar Nova Denominação (Tenant)"**, preencha:
    - **Nome da Denominação** (ex: `Assembleias de Deus`).
    - **E-mail do Administrador** (ex: `admin@denominacao.com`).
-   - **Senha do Administrador** (mínimo de **12 caracteres**).
+   - **Senha do Administrador** (obrigatória, não pode ser vazia).
 2. Clique em **Criar Denominação**.
 3. O administrador criado **pertence ao tenant** e **não** tem privilégios de superuser.
 4. Anote o e-mail e a senha do administrador — será com eles que essa denominação fará login.
 
 > O superusuário pode criar quantas denominações quiser.
 
-### 2.2. Ativar / Desativar uma Denominação
+### 2.2. Ativar / Desativar, Renomear e Excluir uma Denominação
 
-O superusuário pode suspender o acesso de uma denominação. Um tenant **inativo** não permite que seus usuários (exceto superusers) façam login — eles verão a mensagem *"Acesso suspenso"*.
+Na tabela **"Denominações Criadas"**, cada linha tem as ações disponíveis:
 
-### 2.3. Personificar um usuário (suporte)
+- **Ativar / Suspender:** o superusuário pode suspender o acesso de uma denominação. Um tenant **inativo** não permite que seus usuários (exceto superusers) façam login — eles verão a mensagem *"Acesso suspenso"*.
+- **Renomear:** altera o nome exibido da denominação. O nome deve ser único entre os tenants.
+- **Excluir:** remove a denominação **e todos os seus dados** (usuários, áreas, congregações, meses, semanas, rendas e despesas) em cascata. A ação é **irreversível** — confirme com cuidado.
+
+### 2.3. Gerenciar os Usuários de uma Denominação
+
+Ao clicar em **Usuários** em uma denominação, abre um painel para gerenciar as contas daquela denominação:
+
+- **Criar Usuário:** cadastre um novo usuário informando e-mail, senha inicial e **função**:
+  - `administrador`, `supervisor_denominacao`, `supervisor_area` ou `tesoureiro`.
+- **Redefinir Senha:** defina uma nova senha para um usuário (útil em suporte). A nova senha não fica visível após a ação.
+- **Suspender / Ativar:** um usuário **suspenso** não consegue fazer login. O superusuário da plataforma nunca é suspenso.
+
+### 2.4. Personificar um usuário (suporte)
 
 Para fins de suporte e depuração, o superusuário pode "entrar" em uma conta de outro usuário (personificação), gerando um token de acesso para aquela conta.
+
+- Clique em **Ver** na linha do usuário para personificá-lo. Você será levado ao painel daquela conta.
+- Enquanto personificado, um banner âmbar aparece no topo: **"Você está personificando {e-mail}"**, com o botão **Voltar ao modo superuser**.
+- Clique em **Voltar ao modo superuser** para restaurar sua sessão de superusuário e retornar ao Painel Master — sem precisar sair e entrar de novo.
 
 ---
 
@@ -173,5 +190,5 @@ Tesoureiros não podem reabrir meses. Caso um erro grave seja detectado após o 
 ## 6. Dicas Rápidas
 *   **Recálculo Automático:** Você não precisa calcular nada. A cada renda ou despesa excluída ou inserida, o sistema recalcula todos os saldos em tempo real.
 *   **Mensagens Verdes e Vermelhas:** Fique de olho no canto da tela. O sistema usa notificações (toasts) para avisar quando algo deu certo (verde) ou quando houve um erro (vermelho), como esquecer de preencher um campo obrigatório.
-*   **Senhas fortes:** a senha do administrador de denominação exige no mínimo 12 caracteres. Use senhas fortes para todos os usuários.
+*   **Senhas fortes:** use senhas fortes para todos os usuários. A senha só precisa ser não vazia, mas quanto mais forte, melhor.
 *   **Isolamento de dados:** cada usuário só vê os dados da sua jurisdição. O tesoureiro não vê outras congregações; o supervisor de área não vê outras áreas, e assim por diante.

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Wallet, CalendarDays, TrendingUp, Calculator, Trash2, FileText, Printer } from "lucide-react";
+import { Plus, Wallet, CalendarDays, TrendingUp, Calculator, Trash2, FileText, Printer, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { Mes, Semana, DespesaCreateData } from "@/lib/types";
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { user, loading: authLoading, logout } = useAuth();
+    const { user, loading: authLoading, logout, isImpersonating, restoreSuperuser } = useAuth();
     const [meses, setMeses] = useState<Mes[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [selectedMes, setSelectedMes] = useState<Mes | null>(null);
@@ -203,7 +203,7 @@ export default function DashboardPage() {
             <div className="text-center">
               <h1 className="text-2xl font-bold">Acesso de Supervisor</h1>
               <p className="text-slate-400 mt-2">Seu painel de supervisão está em desenvolvimento.</p>
-              <Button onClick={logout} variant="outline" className="mt-4 border-slate-700 hover:bg-slate-800 hover:text-white">Sair</Button>
+              <Button onClick={logout} className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white">Sair</Button>
             </div>
           </div>
         );
@@ -211,6 +211,29 @@ export default function DashboardPage() {
 
     return (
         <div className="flex min-h-screen flex-col bg-[#0B0F19] text-white p-6 md:p-10 font-sans">
+            {isImpersonating && (
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-600/40 bg-amber-950/30 px-4 py-3">
+                    <p className="text-sm text-amber-300">
+                        Você está personificando <span className="font-semibold text-amber-100">{user?.sub}</span>.
+                    </p>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-amber-600/50 text-amber-300 hover:bg-amber-900/40 hover:text-amber-200"
+                        onClick={() => {
+                            if (restoreSuperuser()) {
+                                toast.success("Modo superuser restaurado.");
+                                router.push("/superuser-dashboard");
+                            } else {
+                                toast.error("Não foi possível restaurar o modo superuser.");
+                            }
+                        }}
+                    >
+                        <ShieldCheck className="mr-1 h-4 w-4" />
+                        Voltar ao modo superuser
+                    </Button>
+                </div>
+            )}
             {/* O resto do seu JSX permanece o mesmo */}
         </div>
     );

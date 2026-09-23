@@ -325,3 +325,144 @@ def test_http_tenant_accepts_short_admin_password(bootstrap_client, bootstrap_db
     }, headers=headers)
     assert response.status_code == 201
     assert bootstrap_db.query(models.Denominacao).count() == 1
+
+
+# --- Testes da gestão de usuários e tenants (Painel Master) ---
+
+def _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload, nome="Igreja Alfa", admin_email="admin@alfa.com"):
+    owner = crud.initialize_setup(bootstrap_db, schemas.SetupPayload(**payload))
+    headers = superuser_headers(bootstrap_db, owner.email)
+    response = bootstrap_client.post("/master/tenants", json={
+        "nome_denominacao": nome,
+        "admin_email": admin_email,
+        "admin_password": "admin-password-456",
+    }, headers=headers)
+    assert response.status_code == 201
+    return owner, headers, response.json()
+
+
+def test_master_list_users_all_and_by_tenant(bootstrap_client, bootstrap_db, payload):
+    owner, headers, tenant = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    # Cria um usuário extra no mesmo tenant
+    bootstrap_client.post("/usuarios/", json={
+        "email": "tes@alfa.com", "password": "tes-password", "funcao": "tesoureiro",
+        "denominacao_id": tenant["id"],
+    }, headers=headers)
+
+    all_users = bootstrap_client.get("/master/users", headers=headers)
+    assert all_users.status_code == 200
+    # superuser + admin + tesoureiro
+    assert len(all_users.json()) == 3
+
+    filtered = bootstrap_client.get(f"/master/users?denominacao_id={tenant['id']}", headers=headers)
+    assert filtered.status_code == 200
+    emails = {u["email"] for u in filtered.json()}
+    assert emails == {"admin@alfa.com", "tes@alfa.com"}
+    # superuser não pertence a nenhum tenant, então não aparece no filtro
+    assert payload["superuser_email"] not in emails
+
+
+def test_master_list_users_requires_superuser(bootstrap_client, bootstrap_db, payload):
+    _, _, tenant = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    admin = crud.get_user_by_email(bootstrap_db, "admin@alfa.com")
+    admin_token = security.create_access_token({"sub": admin.email})
+    assert bootstrap_client.get("/master/users").status_code == 401
+    assert bootstrap_client.get("/master/users", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 403
+
+
+def test_master_reset_user_password(bootstrap_client, bootstrap_db, payload):
+    owner, headers, tenant = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    admin = crud.get_user_by_email(bootstrap_db, "admin@alfa.com")
+
+    # senha antiga não funciona
+    assert bootstrap_client.post("/token", data={"username": "admin@alfa.com", "password": "admin-password-456"}).status_code == 200
+    response = bootstrap_client.put(f"/master/users/{admin.id}/password", json={"nova_senha": "nova-senha-123"}, headers=headers)
+    assert response.status_code == 200
+    assert "hashed_password" not in response.json()
+    # senha antiga falha, nova funciona
+    assert bootstrap_client.post("/token", data={"username": "admin@alfa.com", "password": "admin-password-456"}).status_code == 401
+    assert bootstrap_client.post("/token", data={"username": "admin@alfa.com", "password": "nova-senha-123"}).status_code == 200
+
+
+def test_master_reset_password_empty_rejected(bootstrap_client, bootstrap_db, payload):
+    owner, headers, _ = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    admin = crud.get_user_by_email(bootstrap_db, "admin@alfa.com")
+    response = bootstrap_client.put(f"/master/users/{admin.id}/password", json={"nova_senha": ""}, headers=headers)
+    assert response.status_code == 422
+
+
+def test_master_reset_password_404(bootstrap_client, bootstrap_db, payload):
+    owner, headers, _ = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    response = bootstrap_client.put("/master/users/99999/password", json={"nova_senha": "x"}, headers=headers)
+    assert response.status_code == 404
+
+
+def test_master_suspend_user_blocks_login(bootstrap_client, bootstrap_db, payload):
+    owner, headers, _ = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    admin = crud.get_user_by_email(bootstrap_db, "admin@alfa.com")
+
+    # ativo: pode logar
+    assert bootstrap_client.post("/token", data={"username": "admin@alfa.com", "password": "admin-password-456"}).status_code == 200
+    # suspende
+    resp = bootstrap_client.put(f"/master/users/{admin.id}/status", json={"is_active": False}, headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["is_active"] is False
+    # suspenso: não loga
+    assert bootstrap_client.post("/token", data={"username": "admin@alfa.com", "password": "admin-password-456"}).status_code == 403
+    # reativa
+    resp2 = bootstrap_client.put(f"/master/users/{admin.id}/status", json={"is_active": True}, headers=headers)
+    assert resp2.json()["is_active"] is True
+    assert bootstrap_client.post("/token", data={"username": "admin@alfa.com", "password": "admin-password-456"}).status_code == 200
+
+
+def test_master_cannot_suspend_superuser(bootstrap_client, bootstrap_db, payload):
+    owner, headers, _ = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    response = bootstrap_client.put(f"/master/users/{owner.id}/status", json={"is_active": False}, headers=headers)
+    assert response.status_code == 400
+
+
+def test_master_rename_tenant(bootstrap_client, bootstrap_db, payload):
+    owner, headers, tenant = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    response = bootstrap_client.put(f"/master/tenants/{tenant['id']}", json={"nome": "Igreja Renomeada"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["nome"] == "Igreja Renomeada"
+
+
+def test_master_rename_tenant_conflict(bootstrap_client, bootstrap_db, payload):
+    owner, headers, tenant = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload, nome="Igreja Alfa")
+    # cria um segundo tenant
+    bootstrap_client.post("/master/tenants", json={
+        "nome_denominacao": "Igreja Beta", "admin_email": "admin@beta.com", "admin_password": "x",
+    }, headers=headers)
+    # tenta renomear Alfa para Beta (nome já existe)
+    response = bootstrap_client.put(f"/master/tenants/{tenant['id']}", json={"nome": "Igreja Beta"}, headers=headers)
+    assert response.status_code == 409
+
+
+def test_master_rename_tenant_404(bootstrap_client, bootstrap_db, payload):
+    owner, headers, _ = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    response = bootstrap_client.put("/master/tenants/99999", json={"nome": "X"}, headers=headers)
+    assert response.status_code == 404
+
+
+def test_master_delete_tenant_cascades(bootstrap_client, bootstrap_db, payload):
+    owner, headers, tenant = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    admin = crud.get_user_by_email(bootstrap_db, "admin@alfa.com")
+    assert bootstrap_db.query(models.Usuario).count() == 2  # superuser + admin
+
+    # cria dados financeiros para testar o cascade
+    area = crud.create_area(bootstrap_db, schemas.AreaEclesiasticaCreate(nome="Area 1", denominacao_id=tenant["id"]))
+    cong = crud.create_congregacao(bootstrap_db, schemas.CongregacaoCreate(nome="Cong 1", denominacao_id=tenant["id"], area_id=area.id))
+
+    response = bootstrap_client.delete(f"/master/tenants/{tenant['id']}", headers=headers)
+    assert response.status_code == 204
+    assert bootstrap_db.query(models.Denominacao).count() == 0
+    assert bootstrap_db.query(models.Usuario).count() == 1  # só o superuser resta
+    assert bootstrap_db.query(models.Congregacao).count() == 0
+    assert bootstrap_db.query(models.AreaEclesiastica).count() == 0
+
+
+def test_master_delete_tenant_404(bootstrap_client, bootstrap_db, payload):
+    owner, headers, _ = _make_tenant_with_admin(bootstrap_client, bootstrap_db, payload)
+    response = bootstrap_client.delete("/master/tenants/99999", headers=headers)
+    assert response.status_code == 404

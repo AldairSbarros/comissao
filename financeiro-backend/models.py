@@ -69,6 +69,7 @@ class Usuario(Base):
     hashed_password = Column(String, nullable=False)
     funcao = Column(String, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     denominacao_id = Column(Integer, ForeignKey('denominacoes.id'), nullable=True)
     area_id = Column(Integer, ForeignKey('areas_eclesiasticas.id'), nullable=True)
     congregacao_id = Column(Integer, ForeignKey('congregacoes.id'), nullable=True)

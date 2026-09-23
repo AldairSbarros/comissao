@@ -58,8 +58,13 @@ O sistema bloqueia ações automaticamente dependendo do nível do usuário loga
 Todos os endpoints abaixo exigem um usuário `superuser` autenticado (senão retornam `403`):
 *   `GET /master/stats` → estatísticas globais da plataforma (KPIs, crescimento mensal, ranking de tenants).
 *   `GET /master/tenants` → lista todas as denominações (tenants).
-*   `POST /master/tenants` → cria uma denominação **e** o administrador dela em uma transação. Payload: `{ "nome_denominacao": "...", "admin_email": "...", "admin_password": "..." }` (a senha do admin exige **mínimo de 12 caracteres**). O admin criado pertence ao tenant e **não** é superuser.
+*   `POST /master/tenants` → cria uma denominação **e** o administrador dela em uma transação. Payload: `{ "nome_denominacao": "...", "admin_email": "...", "admin_password": "..." }` (a senha do admin é obrigatória e não pode ser vazia). O admin criado pertence ao tenant e **não** é superuser.
+*   `PUT /master/tenants/{tenant_id}` → renomeia uma denominação. Payload: `{ "nome": "..." }`. O nome deve ser único entre os tenants (`409` em caso de conflito).
 *   `PUT /master/tenants/{tenant_id}/status` → ativa/desativa um tenant. Payload: `{ "is_active": true|false }`.
+*   `DELETE /master/tenants/{tenant_id}` → exclui a denominação e, **em cascata**, todas as suas áreas, congregações, usuários, meses, semanas, rendas e despesas. Retorna `204`. Ação irreversível.
+*   `GET /master/users` → lista os usuários da plataforma. Opcionalmente filtra por tenant com o query param `?denominacao_id={id}`.
+*   `PUT /master/users/{user_id}/password` → reseta a senha de um usuário (suporte). Payload: `{ "nova_senha": "..." }`. A nova senha **não** é devolvida na resposta.
+*   `PUT /master/users/{user_id}/status` → ativa/suspende um usuário. Payload: `{ "is_active": true|false }`. Um usuário suspenso não consegue fazer login. O superusuário nunca é suspenso por esta ação (`400`).
 *   `POST /master/users/{user_id}/impersonate` → gera um token JWT para "personificar" outro usuário (suporte/depuração).
 
 ---
@@ -150,7 +155,12 @@ A API possui mecanismos de defesa robustos:
 | **GET** | `/master/stats` | Estatísticas globais da plataforma (superuser). |
 | **GET** | `/master/tenants` | Lista todas as denominações/tenants (superuser). |
 | **POST** | `/master/tenants` | Cria uma denominação + seu administrador (superuser). |
+| **PUT** | `/master/tenants/{id}` | Renomeia uma denominação (superuser). |
 | **PUT** | `/master/tenants/{id}/status` | Ativa/desativa um tenant (superuser). |
+| **DELETE** | `/master/tenants/{id}` | Exclui um tenant e todos os seus dados em cascata (superuser). |
+| **GET** | `/master/users` | Lista usuários, opcionalmente por `?denominacao_id` (superuser). |
+| **PUT** | `/master/users/{id}/password` | Reseta a senha de um usuário (superuser). |
+| **PUT** | `/master/users/{id}/status` | Ativa/suspende um usuário (superuser). |
 | **POST** | `/master/users/{id}/impersonate` | Personifica um usuário para suporte (superuser). |
 
 > **Dica para Desenvolvedores Frontend:** Em requisições de download do PDF (`/balancete/pdf`), configure o seu client HTTP (como Axios) para aceitar `responseType: 'blob'`.

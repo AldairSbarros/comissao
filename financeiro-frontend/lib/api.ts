@@ -1,11 +1,11 @@
 // financeiro-frontend/lib/api.ts
 import axios, { AxiosInstance } from 'axios';
-import { 
-  Despesa, DespesaCreateData, Mes, Semana, Usuario, Denominacao, 
-  DenominacaoCreateData, AreaEclesiastica, AreaEclesiasticaCreateData, 
-  Congregacao, CongregacaoCreateData, UsuarioCreateData, DizimistaOfertante, 
-  DizimistaOfertanteCreateData, DizimistaOfertanteUpdateData, Renda, 
-  RendaCreateData, AnaliseMes 
+import {
+  Despesa, DespesaCreateData, Mes, Semana, Usuario, Denominacao,
+  DenominacaoCreateData, AreaEclesiastica, AreaEclesiasticaCreateData,
+  Congregacao, CongregacaoCreateData, UsuarioCreateData, DizimistaOfertante,
+  DizimistaOfertanteCreateData, DizimistaOfertanteUpdateData, Renda,
+  RendaCreateData, AnaliseMes, UserPasswordReset, UserStatusUpdate, TenantRename
 } from "./types";
 import { MasterStats, SetupPayload, TenantCreate, DenominacaoStatusUpdate } from "./schemas";
 
@@ -228,4 +228,29 @@ export const updateTenantStatus = async (tenantId: number, statusUpdate: Denomin
 export const impersonateUser = async (userId: number): Promise<{ access_token: string }> => {
   const response = await api.post(`/master/users/${userId}/impersonate`);
   return response.data;
+};
+
+export const listMasterUsers = async (denominacaoId?: number): Promise<Usuario[]> => {
+  const params = denominacaoId != null ? { params: { denominacao_id: denominacaoId } } : {};
+  const response = await api.get("/master/users", params);
+  return response.data;
+};
+
+export const resetUserPassword = async (userId: number, payload: UserPasswordReset): Promise<Usuario> => {
+  const response = await api.put(`/master/users/${userId}/password`, payload);
+  return response.data;
+};
+
+export const updateUserStatus = async (userId: number, payload: UserStatusUpdate): Promise<Usuario> => {
+  const response = await api.put(`/master/users/${userId}/status`, payload);
+  return response.data;
+};
+
+export const renameTenant = async (tenantId: number, payload: TenantRename): Promise<Denominacao> => {
+  const response = await api.put(`/master/tenants/${tenantId}`, payload);
+  return response.data;
+};
+
+export const deleteTenant = async (tenantId: number): Promise<void> => {
+  await api.delete(`/master/tenants/${tenantId}`);
 };

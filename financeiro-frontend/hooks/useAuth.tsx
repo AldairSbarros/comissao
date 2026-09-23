@@ -20,8 +20,10 @@ interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
+  isImpersonating: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  restoreSuperuser: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isImpersonating, setIsImpersonating] = useState(false);
   const router = useRouter();
 
   const loadUserFromLocalStorage = useCallback(() => {
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(storedToken);
         setUser(decodedUser);
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        setIsImpersonating(Boolean(localStorage.getItem('superuser_token')));
       }
     } catch (error) {
       console.error('Token inválido ou expirado, limpando localStorage:', error);
@@ -73,6 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const decodedUser = jwtDecode<AuthUser>(accessToken);
       setToken(accessToken);
       setUser(decodedUser);
+      // Login normal encerra qualquer personificação anterior.
+      localStorage.removeItem('superuser_token');
+      setIsImpersonating(false);
 
       if (decodedUser.is_superuser) {
         router.push('/superuser-dashboard');
@@ -90,14 +97,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('superuser_token');
     delete api.defaults.headers.common['Authorization'];
     setUser(null);
     setToken(null);
+    setIsImpersonating(false);
     router.push('/');
   }, [router]);
 
+  const restoreSuperuser = useCallback((): boolean => {
+    const superuserToken = localStorage.getItem('superuser_token');
+    if (!superuserToken) return false;
+    try {
+      const decodedUser = jwtDecode<AuthUser>(superuserToken);
+      localStorage.setItem('access_token', superuserToken);
+      localStorage.removeItem('superuser_token');
+      api.defaults.headers.common['Authorization'] = `Bearer ${superuserToken}`;
+      setToken(superuserToken);
+      setUser(decodedUser);
+      setIsImpersonating(false);
+      return true;
+    } catch (error) {
+      console.error('Token de superuser inválido:', error);
+      localStorage.removeItem('superuser_token');
+      setIsImpersonating(false);
+      return false;
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, isImpersonating, login, logout, restoreSuperuser }}>
       {children}
     </AuthContext.Provider>
   );

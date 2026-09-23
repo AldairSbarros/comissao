@@ -9,7 +9,7 @@ Este é o backend do sistema de controle financeiro eclesiástico, construído c
 *   **Autenticação e Autorização (JWT):** Gerenciamento de usuários com controle de acesso rigoroso baseado em funções (Superusuário, Administrador, Supervisor de Denominação, Supervisor de Área, Tesoureiro), garantindo que cada usuário acesse apenas os dados de sua jurisdição.
 *   **Setup Inicial e Painel Master (Superuser):**
     *   **Setup:** `GET /setup/status` e `POST /setup/initialize` criam o superusuário da plataforma (dono do sistema, sem denominação) na primeira execução.
-    *   **Painel Master:** endpoints `/master/*` exclusivos do superusuário para gerenciar a plataforma — estatísticas globais, listagem de tenants, **criação de Denominação (Tenant) + seu administrador em uma única transação**, ativar/desativar tenants e personificação de usuários para suporte.
+    *   **Painel Master:** endpoints `/master/*` exclusivos do superusuário para gerenciar a plataforma — estatísticas globais, listagem de tenants, **criação de Denominação (Tenant) + seu administrador em uma única transação**, ativar/desativar, renomear e excluir tenants (com exclusão em cascata), **gestão de usuários** (listar, redefinir senha, suspender/ativar) e personificação de usuários para suporte.
     *   **Mudar senha:** `PUT /users/me/password` permite ao usuário alterar a própria senha informando a senha atual.
 *   **Gestão de Hierarquia Eclesiástica (CRUD):**
     *   Gestão de Denominações, Áreas Eclesiásticas e Congregações.

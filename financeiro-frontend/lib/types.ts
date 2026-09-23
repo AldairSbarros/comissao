@@ -62,6 +62,9 @@ export interface Usuario {
   id: number;
   email: string;
   funcao: string;
+  is_active?: boolean;
+  denominacao_id?: number;
+  denominacao?: { id: number; nome: string };
   congregacao_id?: number;
 }
 
@@ -128,6 +131,19 @@ export interface UsuarioCreateData {
   denominacao_id: number;
   area_id?: number;
   congregacao_id?: number;
+}
+
+// --- Schemas de Gestão (Painel Master) ---
+export interface UserPasswordReset {
+  nova_senha: string;
+}
+
+export interface UserStatusUpdate {
+  is_active: boolean;
+}
+
+export interface TenantRename {
+  nome: string;
 }
 
 // --- Schemas de Análise de Mês (para gráficos) ---

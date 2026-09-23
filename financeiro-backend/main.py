@@ -1,6 +1,6 @@
 from datetime import timedelta
 import datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, status, APIRouter # Adicionado APIRouter
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,6 +81,15 @@ def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2Passw
                 raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso suspenso. Por favor, entre em contato com o suporte."
+                )
+    # --- FIM DA LÓGICA ---
+
+    # --- LÓGICA DE VERIFICAÇÃO DE USUÁRIO ATIVO (Superuser ignora) ---
+    # Se o usuário foi suspenso individualmente, bloqueia o login
+    if not user.is_superuser and not user.is_active:
+                raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conta suspensa. Por favor, entre em contato com o suporte."
                 )
     # --- FIM DA LÓGICA ---
 
@@ -185,6 +194,67 @@ def impersonate_user_endpoint(user_id: int, db: Session = Depends(get_db)):
         expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+@master_router.get("/users", response_model=List[schemas.Usuario], summary="Lista usuários (opcionalmente por tenant)")
+def list_users_endpoint(denominacao_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """
+    Lista usuários da plataforma. Se `denominacao_id` for informado,
+    retorna apenas os usuários daquela denominação (tenant).
+    """
+    return crud.get_users(db, denominacao_id=denominacao_id)
+
+@master_router.put("/users/{user_id}/password", response_model=schemas.Usuario, summary="Reseta a senha de um usuário")
+def reset_user_password_endpoint(user_id: int, payload: schemas.UserPasswordReset, db: Session = Depends(get_db)):
+    """
+    Permite ao superusuário resetar a senha de qualquer usuário (ex.: suporte).
+    A nova senha não é devolvida na resposta.
+    """
+    db_user = crud.update_user_password(db, user_id, payload.nova_senha)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    return db_user
+
+@master_router.put("/users/{user_id}/status", response_model=schemas.Usuario, summary="Ativa/Suspende um usuário")
+def set_user_status_endpoint(user_id: int, status_update: schemas.UserStatusUpdate, db: Session = Depends(get_db)):
+    """
+    Ativa ou suspende um usuário. Um usuário suspenso não consegue fazer login.
+    O superusuário nunca é suspenso por esta ação.
+    """
+    target = crud.get_user_by_id(db, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    if target.is_superuser:
+        raise HTTPException(status_code=400, detail="Não é possível suspender o superusuário.")
+    db_user = crud.update_user_status(db, user_id, status_update.is_active)
+    return db_user
+
+@master_router.put("/tenants/{tenant_id}", response_model=schemas.Denominacao, summary="Renomeia uma Denominação (Tenant)")
+def rename_tenant_endpoint(tenant_id: int, payload: schemas.TenantRename, db: Session = Depends(get_db)):
+    """
+    Renomeia uma denominação. O nome deve ser único entre os tenants.
+    """
+    existing = db.query(models.Denominacao).filter(
+        models.Denominacao.nome == payload.nome,
+        models.Denominacao.id != tenant_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Já existe uma denominação com esse nome.")
+    db_denominacao = crud.update_denominacao_nome(db, tenant_id, payload.nome)
+    if not db_denominacao:
+        raise HTTPException(status_code=404, detail="Denominação não encontrada.")
+    return db_denominacao
+
+@master_router.delete("/tenants/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Exclui uma Denominação (Tenant) e todos os seus dados")
+def delete_tenant_endpoint(tenant_id: int, db: Session = Depends(get_db)):
+    """
+    Exclui uma denominação e, em cascata, suas áreas, congregações,
+    usuários, meses, semanas, rendas e despesas. Ação irreversível.
+    """
+    db_denominacao = crud.get_denominacao_by_id(db, tenant_id)
+    if not db_denominacao:
+        raise HTTPException(status_code=404, detail="Denominação não encontrada.")
+    crud.delete_denominacao(db, tenant_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- Registrar o Router do Painel Master ---

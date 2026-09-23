@@ -9,7 +9,7 @@ Este é o frontend da aplicação web de gestão financeira eclesiástica, const
     *   **Avisos de erro claros:** mensagens inline para credenciais incorretas, acesso suspenso (tenant inativo) ou backend fora do ar.
     *   **"Esqueci minha senha":** link que orienta a redefinição pelo administrador (o sistema não envia e-mail).
 *   **Setup Inicial:** na primeira execução, a tela de inicialização cria o **Superusuário da Plataforma** (dono do sistema, sem denominação).
-*   **Painel Master (Superuser):** gestão da plataforma — KPIs globais, gráfico de crescimento de tenants, ranking de denominações ativas, **criação de Denominação (Tenant) + seu administrador em uma única operação**, ativar/desativar tenants e personificação de usuários para suporte.
+*   **Painel Master (Superuser):** gestão da plataforma — KPIs globais, gráfico de crescimento de tenants, ranking de denominações ativas, **criação de Denominação (Tenant) + seu administrador em uma única operação**, ativar/desativar, renomear e excluir tenants, **gestão de usuários** (criar, redefinir senha, suspender/ativar) e personificação de usuários para suporte.
 *   **Painel Administrativo:** Permite o cadastro e a gestão estrutural (Denominações, Áreas Eclesiásticas, Congregações e Usuários).
 *   **Gestão de Tesouraria:**
     *   **Dashboard em Abas:** Separa as funções financeiras do cadastro de membros.
