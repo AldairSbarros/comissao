@@ -4,6 +4,12 @@ Este é o frontend da aplicação web de gestão financeira eclesiástica, const
 
 ## Principais Funcionalidades Implementadas
 
+*   **Autenticação e Painéis por Perfil (RBAC):** Login com JWT e redirecionamento automático para o painel correto conforme o perfil (Superusuário, Administrador, Supervisores, Tesoureiro).
+    *   **Mostrar/ocultar senha:** ícone de olho no campo de senha para conferir a digitação.
+    *   **Avisos de erro claros:** mensagens inline para credenciais incorretas, acesso suspenso (tenant inativo) ou backend fora do ar.
+    *   **"Esqueci minha senha":** link que orienta a redefinição pelo administrador (o sistema não envia e-mail).
+*   **Setup Inicial:** na primeira execução, a tela de inicialização cria o **Superusuário da Plataforma** (dono do sistema, sem denominação).
+*   **Painel Master (Superuser):** gestão da plataforma — KPIs globais, gráfico de crescimento de tenants, ranking de denominações ativas, **criação de Denominação (Tenant) + seu administrador em uma única operação**, ativar/desativar tenants e personificação de usuários para suporte.
 *   **Painel Administrativo:** Permite o cadastro e a gestão estrutural (Denominações, Áreas Eclesiásticas, Congregações e Usuários).
 *   **Gestão de Tesouraria:**
     *   **Dashboard em Abas:** Separa as funções financeiras do cadastro de membros.
@@ -47,4 +53,4 @@ Este é o frontend da aplicação web de gestão financeira eclesiástica, const
     ```
 4.  Abra o navegador em `http://localhost:3000`.
 
-*(Nota: O endereço base da API (`API_BASE_URL`) está configurado no arquivo `lib/api.ts`. Modifique-o se o seu backend estiver sendo executado numa porta ou host diferente em ambiente de produção).*
+*(Nota: O endereço base da API é definido pela variável de ambiente `NEXT_PUBLIC_API_URL` (com fallback para `http://localhost:8001`), configurada no arquivo `lib/api.ts`. Crie um arquivo `.env.local` com `NEXT_PUBLIC_API_URL=http://seu-host:porta` se o seu backend estiver em outro host/porta em ambiente de produção).*

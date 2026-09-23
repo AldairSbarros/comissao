@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DollarSign, Users, CheckCircle, XCircle, Plus } from "lucide-react"; // Ícones para os cards
+import { DollarSign, Users, CheckCircle, XCircle, Plus, LogOut } from "lucide-react"; // Ícones para os cards
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'; // Para gráficos
 
 // Definição das interfaces para os dados (deve refletir o schemas.py do backend)
@@ -33,13 +33,40 @@ interface MasterStats {
   tamanho_db_mb: number;
 }
 
+interface Denominacao {
+  id: number;
+  nome: string;
+  is_active: boolean;
+}
+
 export default function SuperuserDashboardPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth(); // Assume que useAuth fornece o usuário logado
+  const { user, loading: authLoading, logout } = useAuth(); // Assume que useAuth fornece o usuário logado
   const [stats, setStats] = useState<MasterStats | null>(null);
+  const [tenants, setTenants] = useState<Denominacao[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [tenantForm, setTenantForm] = useState({ nome_denominacao: "", admin_email: "", admin_password: "" });
   const [creatingTenant, setCreatingTenant] = useState(false);
+
+  // Carrega as estatísticas e a lista de denominações.
+  // `silent` evita o toast de erro (usado após a criação, que já tem seu próprio feedback).
+  const refreshData = async (silent = false) => {
+    try {
+      const [statsRes, tenantsRes] = await Promise.all([
+        api.get<MasterStats>("/master/stats"),
+        api.get<Denominacao[]>("/master/tenants"),
+      ]);
+      setStats(statsRes.data);
+      setTenants(tenantsRes.data);
+    } catch (error) {
+      console.error("Erro ao carregar dados do Painel Master:", error);
+      if (!silent) {
+        toast.error("Erro ao carregar as estatísticas do sistema.");
+      }
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,15 +75,16 @@ export default function SuperuserDashboardPage() {
       await createTenant(tenantForm);
       toast.success(`Denominação "${tenantForm.nome_denominacao}" criada com sucesso!`);
       setTenantForm({ nome_denominacao: "", admin_email: "", admin_password: "" });
-      const response = await api.get<MasterStats>("/master/stats");
-      setStats(response.data);
     } catch (error) {
       console.error("Erro ao criar denominação:", error);
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(detail || "Erro desconhecido ao criar a denominação.");
-    } finally {
+      toast.error(detail || "Erro ao criar a denominação.");
       setCreatingTenant(false);
+      return;
     }
+    // Atualiza o painel (KPIs + lista) sem acionar o toast de erro de criação.
+    await refreshData(true);
+    setCreatingTenant(false);
   };
 
   useEffect(() => {
@@ -68,19 +96,7 @@ export default function SuperuserDashboardPage() {
     }
 
     if (user && user.is_superuser) {
-      const fetchStats = async () => {
-        try {
-          const response = await api.get<MasterStats>("/master/stats");
-          setStats(response.data);
-          toast.success("Estatísticas carregadas com sucesso!");
-        } catch (error) {
-          console.error("Erro ao buscar estatísticas do Painel Master:", error);
-          toast.error("Erro ao carregar estatísticas do sistema.");
-        } finally {
-          setLoadingStats(false);
-        }
-      };
-      fetchStats();
+      refreshData();
     }
   }, [user, authLoading, router]);
 
@@ -105,7 +121,13 @@ export default function SuperuserDashboardPage() {
 
   return (
     <div className="min-h-screen p-8 bg-slate-950 text-white">
-      <h1 className="text-4xl font-bold mb-8 text-emerald-400">Painel Master</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-4xl font-bold text-emerald-400">Painel Master</h1>
+        <Button onClick={logout} variant="outline" className="border-slate-700 hover:bg-slate-800 hover:text-white">
+          <LogOut className="h-4 w-4 mr-2" />
+          Sair
+        </Button>
+      </div>
 
       {/* Seção de KPIs Principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -171,6 +193,7 @@ export default function SuperuserDashboardPage() {
                 id="tenant_nome"
                 type="text"
                 placeholder="Ex: Assembleias de Deus"
+                autoComplete="off"
                 required
                 value={tenantForm.nome_denominacao}
                 onChange={(e) => setTenantForm(prev => ({ ...prev, nome_denominacao: e.target.value }))}
@@ -183,6 +206,7 @@ export default function SuperuserDashboardPage() {
                 id="tenant_admin_email"
                 type="email"
                 placeholder="admin@denominacao.com"
+                autoComplete="off"
                 required
                 value={tenantForm.admin_email}
                 onChange={(e) => setTenantForm(prev => ({ ...prev, admin_email: e.target.value }))}
@@ -194,9 +218,9 @@ export default function SuperuserDashboardPage() {
               <Input
                 id="tenant_admin_password"
                 type="password"
-                placeholder="Mín. 12 caracteres"
+                placeholder="Senha do administrador"
+                autoComplete="new-password"
                 required
-                minLength={12}
                 value={tenantForm.admin_password}
                 onChange={(e) => setTenantForm(prev => ({ ...prev, admin_password: e.target.value }))}
                 className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
@@ -208,6 +232,44 @@ export default function SuperuserDashboardPage() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Lista de Denominações Criadas */}
+      <Card className="mb-8 bg-slate-900 border-slate-800 text-white">
+        <CardHeader>
+          <CardTitle>Denominações Criadas</CardTitle>
+          <CardDescription>Todas as denominações cadastradas na plataforma.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {tenants && tenants.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left table-auto">
+                <thead>
+                  <tr className="border-b border-slate-700">
+                    <th className="py-2 px-4">Nome</th>
+                    <th className="py-2 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tenants.map((tenant) => (
+                    <tr key={tenant.id} className="border-b border-slate-800 last:border-b-0">
+                      <td className="py-2 px-4">{tenant.nome}</td>
+                      <td className="py-2 px-4">
+                        {tenant.is_active ? (
+                          <span className="text-green-500">Ativa</span>
+                        ) : (
+                          <span className="text-red-500">Suspensa</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-slate-400">Nenhuma denominação criada ainda.</p>
+          )}
         </CardContent>
       </Card>
 

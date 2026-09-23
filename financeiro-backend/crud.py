@@ -509,7 +509,6 @@ def recalcular_saldos_mes(db: Session, mes_id: int):
 
 # --- Funções do Painel Master ---
 import datetime # Adicionado import para datetime para usar em estatísticas
-from sqlalchemy import case # Adicionado case para uso em estatísticas
 import os
 
 def get_platform_statistics(db: Session):
@@ -533,22 +532,25 @@ def get_platform_statistics(db: Session):
     crescimento_tenants_mensal = {row.mes: row.quantidade for row in crescimento_query}
 
     # Top 5 tenants mais ativos (exemplo: por número de transações)
-    # Contabiliza tanto rendas quanto despesas para "atividade"
+    # Contabiliza tanto rendas quanto despesas para "atividade".
+    # Cadeia de joins correta: Denominacao -> Congregacao -> Mes -> Semana -> (Renda | Despesa).
+    # count(distinct) evita inflar os totais devido ao fan-out dos outer joins.
     ranking_tenants_query = db.query(
         models.Denominacao.id,
         models.Denominacao.nome,
         models.Denominacao.is_active,
         models.Denominacao.data_criacao,
-        func.count(models.Usuario.id).label('total_usuarios'),
-        func.count(case((models.Renda.id != None, 1))).label('total_rendas'),
-        func.count(case((models.Despesa.id != None, 1))).label('total_despesas')
+        func.count(func.distinct(models.Usuario.id)).label('total_usuarios'),
+        func.count(func.distinct(models.Renda.id)).label('total_rendas'),
+        func.count(func.distinct(models.Despesa.id)).label('total_despesas')
     ).outerjoin(models.Usuario, models.Denominacao.id == models.Usuario.denominacao_id) \
      .outerjoin(models.Congregacao, models.Denominacao.id == models.Congregacao.denominacao_id) \
-     .outerjoin(models.Semana, models.Congregacao.id == models.Semana.congregacao_id) \
+     .outerjoin(models.Mes, models.Congregacao.id == models.Mes.congregacao_id) \
+     .outerjoin(models.Semana, models.Mes.id == models.Semana.mes_id) \
      .outerjoin(models.Renda, models.Semana.id == models.Renda.semana_id) \
      .outerjoin(models.Despesa, models.Semana.id == models.Despesa.semana_id) \
      .group_by(models.Denominacao.id, models.Denominacao.nome, models.Denominacao.is_active, models.Denominacao.data_criacao) \
-     .order_by(func.count(models.Renda.id).desc(), func.count(models.Despesa.id).desc()) \
+     .order_by(func.count(func.distinct(models.Renda.id)).desc(), func.count(func.distinct(models.Despesa.id)).desc()) \
      .limit(5).all()
 
     ranking_tenants_ativos = []

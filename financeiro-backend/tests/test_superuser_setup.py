@@ -314,7 +314,8 @@ def test_http_setup_rejects_empty_password(bootstrap_client, bootstrap_db, paylo
     assert bootstrap_db.query(models.Usuario).count() == 0
 
 
-def test_http_tenant_rejects_short_admin_password(bootstrap_client, bootstrap_db, payload):
+def test_http_tenant_accepts_short_admin_password(bootstrap_client, bootstrap_db, payload):
+    # O requisito de 12 caracteres foi removido: senha curta (não vazia) é aceita.
     owner = crud.initialize_setup(bootstrap_db, schemas.SetupPayload(**payload))
     headers = superuser_headers(bootstrap_db, owner.email)
     response = bootstrap_client.post("/master/tenants", json={
@@ -322,5 +323,5 @@ def test_http_tenant_rejects_short_admin_password(bootstrap_client, bootstrap_db
         "admin_email": "adminx@example.com",
         "admin_password": "short",
     }, headers=headers)
-    assert response.status_code == 422
-    assert bootstrap_db.query(models.Denominacao).count() == 0
+    assert response.status_code == 201
+    assert bootstrap_db.query(models.Denominacao).count() == 1

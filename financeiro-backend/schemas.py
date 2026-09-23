@@ -239,7 +239,7 @@ class TenantCreate(BaseModel):
     """Schema para criar uma denominacao (tenant) e seu administrador."""
     nome_denominacao: str = Field(min_length=1)
     admin_email: EmailStr
-    admin_password: str = Field(min_length=12)
+    admin_password: str = Field(min_length=1)
 
 class SetupPayload(BaseModel):
     """Schema do setup inicial: cria apenas o superusuario da plataforma."""

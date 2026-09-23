@@ -6,7 +6,11 @@ Este é o backend do sistema de controle financeiro eclesiástico, construído c
 
 ## Funcionalidades Principais
 
-*   **Autenticação e Autorização (JWT):** Gerenciamento de usuários com controle de acesso rigoroso baseado em funções (Administrador, Supervisor de Denominação, Supervisor de Área, Tesoureiro), garantindo que cada usuário acesse apenas os dados de sua jurisdição.
+*   **Autenticação e Autorização (JWT):** Gerenciamento de usuários com controle de acesso rigoroso baseado em funções (Superusuário, Administrador, Supervisor de Denominação, Supervisor de Área, Tesoureiro), garantindo que cada usuário acesse apenas os dados de sua jurisdição.
+*   **Setup Inicial e Painel Master (Superuser):**
+    *   **Setup:** `GET /setup/status` e `POST /setup/initialize` criam o superusuário da plataforma (dono do sistema, sem denominação) na primeira execução.
+    *   **Painel Master:** endpoints `/master/*` exclusivos do superusuário para gerenciar a plataforma — estatísticas globais, listagem de tenants, **criação de Denominação (Tenant) + seu administrador em uma única transação**, ativar/desativar tenants e personificação de usuários para suporte.
+    *   **Mudar senha:** `PUT /users/me/password` permite ao usuário alterar a própria senha informando a senha atual.
 *   **Gestão de Hierarquia Eclesiástica (CRUD):**
     *   Gestão de Denominações, Áreas Eclesiásticas e Congregações.
     *   Proteção contra exclusão acidental (soft-block) que impede deletar instâncias se existirem dados dependentes.
@@ -27,7 +31,7 @@ Este é o backend do sistema de controle financeiro eclesiástico, construído c
 *   `crud.py`: Contém as operações de Create, Read, Update, Delete (CRUD) para interagir com o banco de dados.
 *   `database.py`: Configuração da conexão com o banco de dados.
 *   `security.py`: Funções para hashing de senhas e manipulação de tokens JWT.
-*   `seed.py`: (Opcional) Script para popular o banco de dados com dados iniciais.
+*   `seed.py`: (Opcional) Script para popular o banco de dados com o superusuário inicial. Aceita `--recover` para recuperar uma conta superuser afetada por um erro antigo.
 *   `tests/`: Contém os testes automatizados para a aplicação.
 
 ## Configuração do Ambiente
