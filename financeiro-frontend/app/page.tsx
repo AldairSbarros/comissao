@@ -24,7 +24,12 @@ export default function LoginPage() {
       toast.success("Login realizado com sucesso!");
       router.push("/dashboard"); // Redireciona para o painel
     } catch (error) {
-      toast.error("Email ou senha inválidos.");
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      if (detail) {
+        toast.error(detail);
+      } else {
+        toast.error("Não foi possível conectar ao servidor. Verifique se o backend está no ar.");
+      }
     } finally {
       setIsLoading(false);
     }
