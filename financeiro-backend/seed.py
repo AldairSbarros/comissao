@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal, engine
+from migrations import apply_migrations
 import crud
 import models
 import schemas
@@ -28,6 +29,7 @@ def seed_initial_superuser(*, recover=False):
     """
     models.Base.metadata.create_all(bind=engine)
     models.single_superuser_index.create(bind=engine, checkfirst=True)
+    apply_migrations()
     print(f"Banco utilizado: {engine.url}")
     with SessionLocal() as db:
         if recover:

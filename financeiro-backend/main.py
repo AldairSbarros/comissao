@@ -17,10 +17,13 @@ from fastapi import UploadFile, File
 
 import crud, models, schemas, security
 from database import get_db, engine
+from migrations import apply_migrations
 
 models.Base.metadata.create_all(bind=engine)
 # create_all nao adiciona indices a tabelas que ja existem.
 models.single_superuser_index.create(bind=engine, checkfirst=True)
+# Adiciona colunas novas em tabelas ja existentes (idempotente).
+apply_migrations()
 
 app = FastAPI(
     title="API de Controle Financeiro Eclesiástico",
