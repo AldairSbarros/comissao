@@ -1,0 +1,2 @@
+# Forca line endings LF em scripts shell (obrigatorio para rodar no Linux/VPS).
+*.sh text eol=lf

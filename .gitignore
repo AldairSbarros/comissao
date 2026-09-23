@@ -33,6 +33,8 @@ financeiro-backend/.pytest_cache/
 # O banco de produção no VPS deve ser criado e mantido lá.
 *.db
 *.db-journal
+# Backups criados pelo atualiza.sh no VPS
+backups/
 # ==========================================
 # FRONTEND (Node.js/Next.js)
 # ==========================================
