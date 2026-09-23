@@ -244,7 +244,7 @@ class TenantCreate(BaseModel):
 class SetupPayload(BaseModel):
     """Schema do setup inicial: cria apenas o superusuario da plataforma."""
     superuser_email: EmailStr
-    superuser_password: str = Field(min_length=12)
+    superuser_password: str = Field(min_length=1)
 
 class TenantStats(BaseModel):
     """Estatísticas individuais de um tenant."""

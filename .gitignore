@@ -66,3 +66,11 @@ financeiro-frontend/.env.local
 financeiro-frontend/.env.development.local
 financeiro-frontend/.env.test.local
 financeiro-frontend/.env.production.local
+
+
+node_modules/
+.next/
+dist/
+build/
+venv/
+__pycache__/

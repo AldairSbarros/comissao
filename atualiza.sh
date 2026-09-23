@@ -14,6 +14,7 @@
 #   ./atualiza.sh              # atualização normal
 #   ./atualiza.sh --recover    # também permite recuperar a senha do superuser
 #   ./atualiza.sh --no-seed    # faz tudo, mas pula o seed
+#   ./atualiza.sh --reset      # apaga o banco e recomeça do zero (pede email e senha)
 #
 set -euo pipefail
 
@@ -33,21 +34,29 @@ fi
 # --- Flags ---------------------------------------------------------------
 RECOVER=""
 RUN_SEED=1
+RESET=0
 for arg in "$@"; do
   case "$arg" in
     --recover) RECOVER="--recover" ;;
     --no-seed) RUN_SEED=0 ;;
+    --reset) RESET=1 ;;
     -h|--help)
       grep '^#' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
       echo "ERRO: opção desconhecida: $arg" >&2
-      echo "Use: ./atualiza.sh [--recover] [--no-seed]" >&2
+      echo "Use: ./atualiza.sh [--recover] [--no-seed] [--reset]" >&2
       exit 1
       ;;
   esac
 done
+
+# --reset é um recomeço do zero: força o seed e descarta o modo --recover.
+if [ "$RESET" -eq 1 ]; then
+  RUN_SEED=1
+  RECOVER=""
+fi
 
 # --- 1. Backup -----------------------------------------------------------
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
@@ -73,6 +82,17 @@ git pull --ff-only
 # --- 3. Build -------------------------------------------------------------
 echo "==> [3/5] Rebuild das imagens Docker..."
 $COMPOSE build
+
+# --- 3.5 Reset (opcional): apaga o banco para recomeçar do zero -----------
+if [ "$RESET" -eq 1 ]; then
+  echo "==> [3.5/5] Reset: apagando o banco de dados atual..."
+  if [ -d "./financeiro_data" ]; then
+    rm -rf ./financeiro_data
+    echo "    OK: banco apagado. O seed pedirá email e senha do superuser."
+  else
+    echo "    Aviso: ./financeiro_data não existe. Nada a apagar."
+  fi
+fi
 
 # --- 4. Up ----------------------------------------------------------------
 echo "==> [4/5] Subindo os containers..."

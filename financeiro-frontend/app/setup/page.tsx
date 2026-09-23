@@ -99,9 +99,8 @@ export default function SetupPage() {
                     <Input
                     id="superuser_password"
                     type="password"
-                    placeholder="Defina uma senha forte (mín. 12 caracteres)"
+                    placeholder="Defina uma senha"
                     required
-                    minLength={12}
                     value={formData.superuser_password}
                     onChange={(e) => handleChange(e, "superuser_password")}
                     className="bg-slate-800 border-slate-700 focus:ring-emerald-500"

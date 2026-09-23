@@ -13,8 +13,8 @@ import security
 
 def read_password(label):
     password = getpass(label)
-    if len(password) < 12:
-        raise ValueError("A senha deve ter pelo menos 12 caracteres.")
+    if not password:
+        raise ValueError("A senha nao pode estar vazia.")
     if password != getpass("Confirme a senha: "):
         raise ValueError("As senhas nao coincidem.")
     return password
@@ -30,13 +30,8 @@ def seed_initial_superuser(*, recover=False):
     models.single_superuser_index.create(bind=engine, checkfirst=True)
     print(f"Banco utilizado: {engine.url}")
     with SessionLocal() as db:
-        existing = db.query(models.Usuario).filter(models.Usuario.is_superuser.is_(True)).first()
-        if existing:
-            print("Superusuario ja existe. Nenhum dado ou senha foi alterado.")
-            return
-
-        email = schemas.UsuarioBase(email=input("Email do superusuario: ").strip()).email
         if recover:
+            email = schemas.UsuarioBase(email=input("Email do superusuario: ").strip()).email
             user = crud.get_user_by_email(db, email)
             if not user or user.funcao != "superuser" or any(
                 value is not None for value in (user.denominacao_id, user.area_id, user.congregacao_id)
@@ -49,6 +44,12 @@ def seed_initial_superuser(*, recover=False):
             print("Superusuario recuperado. Demais usuarios e dados foram preservados.")
             return
 
+        existing = db.query(models.Usuario).filter(models.Usuario.is_superuser.is_(True)).first()
+        if existing:
+            print("Superusuario ja existe. Nenhum dado ou senha foi alterado.")
+            return
+
+        email = schemas.UsuarioBase(email=input("Email do superusuario: ").strip()).email
         if crud.get_user_by_email(db, email):
             raise ValueError("Email ja cadastrado. Para uma conta superuser afetada pelo erro antigo, use --recover.")
         crud.initialize_setup(db, schemas.SetupPayload(
@@ -65,7 +66,7 @@ def main():
     try:
         seed_initial_superuser(recover=args.recover)
     except ValidationError:
-        print("Dados invalidos. Verifique o email e a senha (minimo 12 caracteres).")
+        print("Dados invalidos. Verifique o email e a senha.")
         return 1
     except IntegrityError:
         print("Conflito de unicidade no banco. Verifique se ja existe superusuario ou email cadastrado.")

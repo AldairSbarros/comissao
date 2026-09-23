@@ -260,6 +260,21 @@ def test_seed_recovers_legacy_superuser_without_changing_tenants(bootstrap_db, m
     assert bootstrap_db.query(models.Denominacao).one().id == tenant.id
 
 
+def test_seed_recovers_normal_superuser_password(bootstrap_db, monkeypatch):
+    owner = crud.initialize_setup(bootstrap_db, schemas.SetupPayload(
+        superuser_email="owner@example.com", superuser_password="old-password",
+    ))
+    assert owner.is_superuser is True
+    monkeypatch.setattr("builtins.input", lambda _: owner.email)
+    monkeypatch.setattr(seed, "getpass", lambda _: "new-secure-password")
+    seed.seed_initial_superuser(recover=True)
+    bootstrap_db.refresh(owner)
+    assert owner.is_superuser
+    assert security.verify_password("new-secure-password", owner.hashed_password)
+    assert not security.verify_password("old-password", owner.hashed_password)
+    assert bootstrap_db.query(models.Usuario).count() == 1
+
+
 def test_seed_does_not_promote_regular_user(bootstrap_db, monkeypatch):
     user = crud.create_user(bootstrap_db, schemas.UsuarioCreate(
         email="regular@example.com", password="regular-password", funcao="administrador",
@@ -282,18 +297,19 @@ def test_seed_rejects_duplicate_email_without_promoting(bootstrap_db, monkeypatc
     assert not user.is_superuser
 
 
-@pytest.mark.parametrize("passwords", [["short"], ["long-enough-password", "different-password"]])
+@pytest.mark.parametrize("passwords", [["", ""], ["valid-password", "different-password"]])
 def test_seed_rejects_bad_password_before_writing(bootstrap_db, monkeypatch, passwords):
-    answers = iter(passwords)
-    monkeypatch.setattr("builtins.input", lambda _: "owner@example.com")
-    monkeypatch.setattr(seed, "getpass", lambda _: next(answers))
+    answers = iter(["owner@example.com"])
+    password_iter = iter(passwords)
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    monkeypatch.setattr(seed, "getpass", lambda _: next(password_iter))
     with pytest.raises(ValueError):
         seed.seed_initial_superuser()
     assert bootstrap_db.query(models.Usuario).count() == 0
 
 
-def test_http_setup_rejects_short_password(bootstrap_client, bootstrap_db, payload):
-    payload["superuser_password"] = "short"
+def test_http_setup_rejects_empty_password(bootstrap_client, bootstrap_db, payload):
+    payload["superuser_password"] = ""
     assert bootstrap_client.post("/setup/initialize", json=payload).status_code == 422
     assert bootstrap_db.query(models.Usuario).count() == 0
 
