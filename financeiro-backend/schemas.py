@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from typing import List, Optional
 from datetime import date # Importar date para o campo data_registro
 
@@ -237,14 +237,14 @@ class TokenData(BaseModel):
 
 class InitialTenantCreate(BaseModel):
     """Schema para criar a primeira denominação durante o setup."""
-    nome_denominacao: str
+    nome_denominacao: str = Field(min_length=1)
     admin_email: EmailStr
-    admin_password: str
+    admin_password: str = Field(min_length=12)
 
 class SetupPayload(BaseModel):
     """Schema completo para o payload do endpoint de setup."""
     superuser_email: EmailStr
-    superuser_password: str
+    superuser_password: str = Field(min_length=12)
     tenant: InitialTenantCreate
 
 class TenantStats(BaseModel):

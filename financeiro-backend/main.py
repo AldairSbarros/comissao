@@ -9,6 +9,7 @@ from fastapi.responses import Response, JSONResponse # Adicionado JSONResponse
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
+from sqlalchemy.exc import IntegrityError
 from fpdf import FPDF # Importação correta para fpdf2
 import os
 import shutil
@@ -18,6 +19,8 @@ import crud, models, schemas, security
 from database import get_db, engine
 
 models.Base.metadata.create_all(bind=engine)
+# create_all nao adiciona indices a tabelas que ja existem.
+models.single_superuser_index.create(bind=engine, checkfirst=True)
 
 app = FastAPI(
     title="API de Controle Financeiro Eclesiástico",
@@ -106,38 +109,12 @@ def initialize_setup(setup_payload: schemas.SetupPayload, db: Session = Depends(
     Cria o superusuário, a primeira denominação e seu administrador inicial.
     Só pode ser chamado se nenhum superusuário existir.
     """
-    # 1. Verifica se já existe um superusuário
-    existing_superuser = db.query(models.Usuario).filter(models.Usuario.is_superuser == True).first()
-    if existing_superuser:
-        raise HTTPException(status_code=400, detail="Setup já realizado. Superusuário já existe.")
-
-    # 2. Cria o Superusuário
-    superuser_data = schemas.UsuarioCreate(
-        email=setup_payload.superuser_email,
-        password=setup_payload.superuser_password,
-        funcao="superuser",
-        is_superuser=True,
-        denominacao_id=None # Superuser não pertence a uma denominação
-    )
-    new_superuser = crud.create_user(db, user=superuser_data)
-
-    # 3. Cria a primeira denominação (tenant)
-    denominacao_data = schemas.DenominacaoCreate(
-        nome=setup_payload.tenant.nome_denominacao
-    )
-    new_denominacao = crud.create_denominacao(db, denominacao=denominacao_data)
-
-    # 4. Cria o administrador para essa denominação
-    admin_tenant_data = schemas.UsuarioCreate(
-        email=setup_payload.tenant.admin_email,
-        password=setup_payload.tenant.admin_password,
-        funcao="administrador",
-        denominacao_id=new_denominacao.id,
-        is_superuser=False # Não é um superuser
-    )
-    crud.create_user(db, user=admin_tenant_data)
-
-    return new_superuser
+    try:
+        return crud.initialize_setup(db, setup_payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Conflito no setup. Nenhum cadastro parcial foi salvo.") from exc
 
 # --- APIRouter para o Painel Master (Exclusivo para Superuser) ---
 master_router = APIRouter(
@@ -199,7 +176,15 @@ app.include_router(master_router)
 
 # --- Endpoints de Setup e Usuários ---
 @app.post("/usuarios/", response_model=schemas.Usuario)
-def create_user_endpoint(user: schemas.UsuarioCreate, db: Session = Depends(get_db)):
+def create_user_endpoint(
+    user: schemas.UsuarioCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_superuser),
+):
+    if user.is_superuser or user.funcao.strip().lower() == "superuser":
+        raise HTTPException(status_code=403, detail="Superusuario so pode ser criado pelo setup inicial ou seed.")
+    if user.funcao not in {"administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro"}:
+        raise HTTPException(status_code=400, detail="Funcao de usuario invalida.")
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")

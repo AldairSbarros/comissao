@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Date, Boolean # Importado Date e Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Date, Boolean, Index # Importado Date e Boolean
 from sqlalchemy.orm import relationship, sessionmaker
 from database import Base
 
@@ -75,6 +75,15 @@ class Usuario(Base):
     denominacao = relationship("Denominacao", back_populates="usuarios")
     area_responsavel = relationship("AreaEclesiastica", back_populates="usuarios_responsavel")
     congregacao = relationship("Congregacao", back_populates="usuarios")
+
+# O indice parcial permite varios usuarios comuns, mas apenas um superusuario.
+single_superuser_index = Index(
+    "uq_usuarios_single_superuser",
+    Usuario.is_superuser,
+    unique=True,
+    sqlite_where=Usuario.is_superuser.is_(True),
+    postgresql_where=Usuario.is_superuser.is_(True),
+)
 
 class Mes(Base):
     __tablename__ = 'meses'

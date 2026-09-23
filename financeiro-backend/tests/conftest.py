@@ -8,15 +8,20 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from main import app  # Isso deve funcionar agora
 from database import Base, get_db
 import crud, models, security, schemas
 from datetime import timedelta
 
-# Configuração do banco de dados de teste em memória
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-# Use check_same_thread=False para SQLite no desenvolvimento/teste se for usar threads
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+# Banco de dados em memória compartilhado por uma única conexão (StaticPool),
+# evitando contensão de lock do SQLite entre a sessão de teste e o app.
+SQLALCHEMY_DATABASE_URL = "sqlite://"
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Override the get_db dependency for tests

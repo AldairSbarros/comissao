@@ -141,20 +141,58 @@ def delete_congregacao(db: Session, congregacao_id: int):
     db.commit()
     return db_congregacao
 
-def create_user(db: Session, user: schemas.UsuarioCreate):
+def create_user(db: Session, user: schemas.UsuarioCreate, *, commit: bool = True):
     hashed_password = security.get_password_hash(user.password)
     db_user = models.Usuario(
         email=user.email,
         hashed_password=hashed_password,
         funcao=user.funcao,
+        is_superuser=user.is_superuser,
         denominacao_id=user.denominacao_id,
         area_id=user.area_id,
         congregacao_id=user.congregacao_id
     )
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    if commit:
+        db.commit()
+        db.refresh(db_user)
+    else:
+        db.flush()
     return db_user
+
+def initialize_setup(db: Session, payload: schemas.SetupPayload):
+    """Cria a plataforma e seu primeiro tenant em uma unica transacao."""
+    try:
+        if db.query(models.Usuario).filter(models.Usuario.is_superuser.is_(True)).first():
+            raise ValueError("Setup ja realizado. Superusuario ja existe.")
+        if payload.superuser_email == payload.tenant.admin_email:
+            raise ValueError("Use emails diferentes para o superusuario e o administrador.")
+        for email in (payload.superuser_email, payload.tenant.admin_email):
+            if get_user_by_email(db, email):
+                raise ValueError("Email ja cadastrado. Verifique as contas existentes antes do setup.")
+        if db.query(models.Denominacao).filter_by(nome=payload.tenant.nome_denominacao).first():
+            raise ValueError("Denominacao ja cadastrada. Nenhum dado foi alterado.")
+
+        superuser = create_user(db, schemas.UsuarioCreate(
+            email=payload.superuser_email,
+            password=payload.superuser_password,
+            funcao="superuser",
+            is_superuser=True,
+        ), commit=False)
+        denominacao = models.Denominacao(nome=payload.tenant.nome_denominacao)
+        db.add(denominacao)
+        db.flush()
+        create_user(db, schemas.UsuarioCreate(
+            email=payload.tenant.admin_email,
+            password=payload.tenant.admin_password,
+            funcao="administrador",
+            denominacao_id=denominacao.id,
+        ), commit=False)
+        db.commit()
+        return superuser
+    except Exception:
+        db.rollback()
+        raise
 
 def create_denominacao(db: Session, denominacao: schemas.DenominacaoCreate):
     db_denominacao = models.Denominacao(**denominacao.model_dump())
