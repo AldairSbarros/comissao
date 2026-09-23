@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,16 +12,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
   const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await login(email, password); // A função login virá do useAuth
+      await login(email, password); // O login() já faz o redirect para o painel correto
       toast.success("Login realizado com sucesso!");
-      router.push("/dashboard"); // Redireciona para o painel
     } catch (error) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       if (detail) {

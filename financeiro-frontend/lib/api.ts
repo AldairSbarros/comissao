@@ -11,6 +11,9 @@ import { MasterStats, SetupPayload, TenantCreate, DenominacaoStatusUpdate } from
 
 // A URL base da API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+// Prefixo da aplicação no domínio (precisa espelhar o basePath do next.config.ts).
+// Usado em redirects "cruos" do navegador, que não aplicam o basePath automaticamente.
+const BASE_PATH = "/financeiro";
 
 // Cria e exporta a instância do Axios
 export const api: AxiosInstance = axios.create({
@@ -35,7 +38,9 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem("access_token");
-        window.location.href = '/';
+        // Redirect "cru" do navegador: precisa incluir o basePath manualmente,
+        // senão cai na raiz do domínio (ex.: landing page de outro site no mesmo domínio).
+        window.location.href = `${BASE_PATH}/`;
       }
     }
     return Promise.reject(error);
