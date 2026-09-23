@@ -4,6 +4,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# URL da API embutida no bundle do navegador (build-time).
+# Sem este ARG, o valor passado pelo compose é ignorado e o app
+# cai no fallback http://localhost:8001 (a máquina do navegador).
+ARG NEXT_PUBLIC_API_URL=/financeiro/api
+
 # Copia os arquivos de dependência e instala
 COPY package*.json ./
 RUN npm install
