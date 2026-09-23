@@ -7,7 +7,7 @@ import {
   DizimistaOfertanteCreateData, DizimistaOfertanteUpdateData, Renda, 
   RendaCreateData, AnaliseMes 
 } from "./types";
-import { MasterStats, SetupPayload, DenominacaoStatusUpdate } from "./schemas";
+import { MasterStats, SetupPayload, TenantCreate, DenominacaoStatusUpdate } from "./schemas";
 
 // A URL base da API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
@@ -202,6 +202,11 @@ export const getMasterStats = async (): Promise<MasterStats> => {
 
 export const listAllTenants = async (): Promise<Denominacao[]> => {
   const response = await api.get("/master/tenants");
+  return response.data;
+};
+
+export const createTenant = async (payload: TenantCreate): Promise<Denominacao> => {
+  const response = await api.post("/master/tenants", payload);
   return response.data;
 };
 

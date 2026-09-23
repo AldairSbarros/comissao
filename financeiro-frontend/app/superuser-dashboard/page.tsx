@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/lib/api";
+import { api, createTenant } from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { DollarSign, Users, CheckCircle, XCircle } from "lucide-react"; // Ícones para os cards
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { DollarSign, Users, CheckCircle, XCircle, Plus } from "lucide-react"; // Ícones para os cards
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'; // Para gráficos
 
 // Definição das interfaces para os dados (deve refletir o schemas.py do backend)
@@ -35,6 +38,26 @@ export default function SuperuserDashboardPage() {
   const { user, loading: authLoading } = useAuth(); // Assume que useAuth fornece o usuário logado
   const [stats, setStats] = useState<MasterStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [tenantForm, setTenantForm] = useState({ nome_denominacao: "", admin_email: "", admin_password: "" });
+  const [creatingTenant, setCreatingTenant] = useState(false);
+
+  const handleCreateTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingTenant(true);
+    try {
+      await createTenant(tenantForm);
+      toast.success(`Denominação "${tenantForm.nome_denominacao}" criada com sucesso!`);
+      setTenantForm({ nome_denominacao: "", admin_email: "", admin_password: "" });
+      const response = await api.get<MasterStats>("/master/stats");
+      setStats(response.data);
+    } catch (error) {
+      console.error("Erro ao criar denominação:", error);
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || "Erro desconhecido ao criar a denominação.");
+    } finally {
+      setCreatingTenant(false);
+    }
+  };
 
   useEffect(() => {
     // Redireciona se não for superusuário
@@ -128,6 +151,65 @@ export default function SuperuserDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Criar Nova Denominação (Tenant) */}
+      <Card className="mb-8 bg-slate-900 border-slate-800 text-white">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5 text-emerald-400" />
+            Criar Nova Denominação (Tenant)
+          </CardTitle>
+          <CardDescription>
+            Cadastre uma nova denominação e o administrador dela. O administrador pertence ao tenant e não tem privilégios de superuser.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreateTenant} className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-2">
+              <Label htmlFor="tenant_nome">Nome da Denominação</Label>
+              <Input
+                id="tenant_nome"
+                type="text"
+                placeholder="Ex: Assembleias de Deus"
+                required
+                value={tenantForm.nome_denominacao}
+                onChange={(e) => setTenantForm(prev => ({ ...prev, nome_denominacao: e.target.value }))}
+                className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tenant_admin_email">E-mail do Administrador</Label>
+              <Input
+                id="tenant_admin_email"
+                type="email"
+                placeholder="admin@denominacao.com"
+                required
+                value={tenantForm.admin_email}
+                onChange={(e) => setTenantForm(prev => ({ ...prev, admin_email: e.target.value }))}
+                className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tenant_admin_password">Senha do Administrador</Label>
+              <Input
+                id="tenant_admin_password"
+                type="password"
+                placeholder="Mín. 12 caracteres"
+                required
+                minLength={12}
+                value={tenantForm.admin_password}
+                onChange={(e) => setTenantForm(prev => ({ ...prev, admin_password: e.target.value }))}
+                className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="md:col-span-3">
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500" disabled={creatingTenant}>
+                {creatingTenant ? "Criando..." : "Criar Denominação"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {/* Gráfico de Crescimento de Tenants */}
       <Card className="mb-8 bg-slate-900 border-slate-800 text-white">

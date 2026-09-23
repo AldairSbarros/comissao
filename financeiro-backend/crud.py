@@ -161,35 +161,46 @@ def create_user(db: Session, user: schemas.UsuarioCreate, *, commit: bool = True
     return db_user
 
 def initialize_setup(db: Session, payload: schemas.SetupPayload):
-    """Cria a plataforma e seu primeiro tenant em uma unica transacao."""
+    """Cria o superusuario da plataforma (dono do sistema, sem tenant)."""
     try:
         if db.query(models.Usuario).filter(models.Usuario.is_superuser.is_(True)).first():
             raise ValueError("Setup ja realizado. Superusuario ja existe.")
-        if payload.superuser_email == payload.tenant.admin_email:
-            raise ValueError("Use emails diferentes para o superusuario e o administrador.")
-        for email in (payload.superuser_email, payload.tenant.admin_email):
-            if get_user_by_email(db, email):
-                raise ValueError("Email ja cadastrado. Verifique as contas existentes antes do setup.")
-        if db.query(models.Denominacao).filter_by(nome=payload.tenant.nome_denominacao).first():
-            raise ValueError("Denominacao ja cadastrada. Nenhum dado foi alterado.")
-
+        if get_user_by_email(db, payload.superuser_email):
+            raise ValueError("Email ja cadastrado. Verifique as contas existentes antes do setup.")
         superuser = create_user(db, schemas.UsuarioCreate(
             email=payload.superuser_email,
             password=payload.superuser_password,
             funcao="superuser",
             is_superuser=True,
         ), commit=False)
-        denominacao = models.Denominacao(nome=payload.tenant.nome_denominacao)
+        db.commit()
+        return superuser
+    except Exception:
+        db.rollback()
+        raise
+
+def create_tenant(db: Session, tenant: schemas.TenantCreate):
+    """Cria uma denominacao e seu administrador em uma unica transacao.
+
+    So pode ser chamado pelo superusuario. O administrador criado pertence ao
+    tenant e nao tem privilégios de superuser.
+    """
+    try:
+        if db.query(models.Denominacao).filter_by(nome=tenant.nome_denominacao).first():
+            raise ValueError("Denominacao ja cadastrada. Nenhum dado foi alterado.")
+        if get_user_by_email(db, tenant.admin_email):
+            raise ValueError("Email do administrador ja cadastrado. Use um email diferente.")
+        denominacao = models.Denominacao(nome=tenant.nome_denominacao)
         db.add(denominacao)
         db.flush()
-        create_user(db, schemas.UsuarioCreate(
-            email=payload.tenant.admin_email,
-            password=payload.tenant.admin_password,
+        admin = create_user(db, schemas.UsuarioCreate(
+            email=tenant.admin_email,
+            password=tenant.admin_password,
             funcao="administrador",
             denominacao_id=denominacao.id,
         ), commit=False)
         db.commit()
-        return superuser
+        return denominacao, admin
     except Exception:
         db.rollback()
         raise

@@ -106,8 +106,9 @@ def get_setup_status(db: Session = Depends(get_db)):
 @app.post("/setup/initialize", response_model=schemas.Usuario, status_code=status.HTTP_201_CREATED, summary="Executa o setup inicial do sistema")
 def initialize_setup(setup_payload: schemas.SetupPayload, db: Session = Depends(get_db)):
     """
-    Cria o superusuário, a primeira denominação e seu administrador inicial.
+    Cria apenas o superusuário da plataforma (dono do sistema, sem denominação).
     Só pode ser chamado se nenhum superusuário existir.
+    As denominações (tenants) são criadas depois pelo superusuário em /master/tenants.
     """
     try:
         return crud.initialize_setup(db, setup_payload)
@@ -137,6 +138,21 @@ def list_tenants_endpoint(db: Session = Depends(get_db)):
     Lista todas as denominações (clientes) registradas no sistema.
     """
     return crud.get_denominacoes(db)
+
+@master_router.post("/tenants", response_model=schemas.Denominacao, status_code=status.HTTP_201_CREATED, summary="Cria uma Denominação (Tenant) e seu administrador")
+def create_tenant_endpoint(tenant: schemas.TenantCreate, db: Session = Depends(get_db)):
+    """
+    Cria uma nova denominação e o administrador dela, em uma única transação.
+    O administrador pertence ao tenant e não tem privilégios de superuser.
+    O superuser pode criar quantas denominações quiser.
+    """
+    try:
+        db_denominacao, _admin = crud.create_tenant(db, tenant)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Conflito ao criar a denominação. Nenhum cadastro parcial foi salvo.") from exc
+    return db_denominacao
 
 @master_router.put("/tenants/{tenant_id}/status", response_model=schemas.Denominacao, summary="Ativa/Desativa uma Denominação (Tenant)")
 def set_tenant_status_endpoint(

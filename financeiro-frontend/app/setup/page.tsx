@@ -12,18 +12,12 @@ import { api } from "@/lib/api"; // Import do cliente de API
 interface SetupFormData {
   superuser_email: string;
   superuser_password: string;
-  tenant_nome_denominacao: string;
-  tenant_admin_email: string;
-  tenant_admin_password: string;
 }
 
 export default function SetupPage() {
   const [formData, setFormData] = useState<SetupFormData>({
     superuser_email: "",
     superuser_password: "",
-    tenant_nome_denominacao: "",
-    tenant_admin_email: "",
-    tenant_admin_password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -46,17 +40,12 @@ export default function SetupPage() {
       const payload = {
         superuser_email: formData.superuser_email,
         superuser_password: formData.superuser_password,
-        tenant: {
-          nome_denominacao: formData.tenant_nome_denominacao,
-          admin_email: formData.tenant_admin_email,
-          admin_password: formData.tenant_admin_password,
-        }
       };
 
       const response = await api.post("/setup/initialize", payload);
       
       if (response.status === 201) {
-        toast.success("Setup realizado com sucesso!");
+        toast.success("Superusuário criado com sucesso! Agora crie as denominações no Painel Master.");
         setTimeout(() => {
           router.push("/"); // Redireciona para a página de login
           // Necessário recarregar para limpar o estado e forçar a verificação do status novamente
@@ -65,10 +54,10 @@ export default function SetupPage() {
       } else {
         throw new Error("Erro inexistente");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao realizar setup:", error);
-      const errorMessage = error.response?.data?.detail || "Erro desconhecido ao realizar o setup.";
-      toast.error(errorMessage);
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || "Erro desconhecido ao realizar o setup.");
     } finally {
       setIsLoading(false);
     }
@@ -80,17 +69,18 @@ export default function SetupPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-3xl">Inicialização do Sistema</CardTitle>
           <CardDescription>
-            Configure o Superusuário da Plataforma e a primeira Denominação (Tenant) para começar a usar o sistema.
+            Crie o Superusuário da Plataforma. As denominações (tenants) e seus
+            administradores serão criados depois, no Painel Master.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="grid gap-6">
             
             {/* Seção: Superusuário da Plataforma */}
-            <div className="space-y-4 border-b border-slate-700 pb-4">
-              <h3 className="text-lg font-semibold text-emerald-400">1. Superusuário da Plataforma</h3>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-emerald-400">Superusuário da Plataforma</h3>
               <p className="text-sm text-slate-400">
-                Este usuário terá acesso total e irrestrito a toda a plataforma.
+                Este usuário é o dono do sistema, tem acesso total e não pertence a nenhuma denominação.
               </p>
               <div className="grid gap-2">
                 <Label htmlFor="superuser_email">Seu E-mail</Label>
@@ -109,54 +99,11 @@ export default function SetupPage() {
                     <Input
                     id="superuser_password"
                     type="password"
-                    placeholder="Defina uma senha forte"
+                    placeholder="Defina uma senha forte (mín. 12 caracteres)"
                     required
+                    minLength={12}
                     value={formData.superuser_password}
                     onChange={(e) => handleChange(e, "superuser_password")}
-                    className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
-                  />
-                </div>
-            </div>
-
-            {/* Seção: Primeira Denominação */}
-            <div className="space-y-4 border-b border-slate-700 pb-4">
-              <h3 className="text-lg font-semibold text-emerald-400">2. Primeira Denominação (Tenant)</h3>
-              <p className="text-sm text-slate-400">
-                Cadastre a primeira igreja e o administrador dela.
-              </p>
-              <div className="grid gap-2">
-                <Label htmlFor="tenant_nome_denominacao">Nome da Denominação</Label>
-                <Input
-                    id="tenant_nome_denominacao"
-                    type="text"
-                    placeholder="Ex: Assembleias de Deus"
-                    required
-                    value={formData.tenant_nome_denominacao}
-                    onChange={(e) => handleChange(e, "tenant_nome_denominacao")}
-                    className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="tenant_admin_email">E-mail do Administrador</Label>
-                  <Input
-                    id="tenant_admin_email"
-                    type="email"
-                    placeholder="admin@denominacao.com"
-                    required
-                    value={formData.tenant_admin_email}
-                    onChange={(e) => handleChange(e, "tenant_admin_email")}
-                    className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="tenant_admin_password">Senha do Administrador</Label>
-                    <Input
-                    id="tenant_admin_password"
-                    type="password"
-                    placeholder="Defina a senha do administrador"
-                    required
-                    value={formData.tenant_admin_password}
-                    onChange={(e) => handleChange(e, "tenant_admin_password")}
                     className="bg-slate-800 border-slate-700 focus:ring-emerald-500"
                   />
                 </div>

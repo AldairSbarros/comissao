@@ -3,7 +3,7 @@
 
 // --- Schemas do Painel Master (Superuser) ---
 
-export interface InitialTenantCreate {
+export interface TenantCreate {
   nome_denominacao: string;
   admin_email: string;
   admin_password: string;
@@ -12,7 +12,6 @@ export interface InitialTenantCreate {
 export interface SetupPayload {
   superuser_email: string;
   superuser_password: string;
-  tenant: InitialTenantCreate;
 }
 
 export interface TenantStats {

@@ -21,6 +21,11 @@ def read_password(label):
 
 
 def seed_initial_superuser(*, recover=False):
+    """Cria apenas o superusuario da plataforma (dono do sistema, sem tenant).
+
+    As denominacoes (tenants) e seus administradores sao criados depois, pelo
+    superusuario, via POST /master/tenants (ou painel master).
+    """
     models.Base.metadata.create_all(bind=engine)
     models.single_superuser_index.create(bind=engine, checkfirst=True)
     print(f"Banco utilizado: {engine.url}")
@@ -46,30 +51,24 @@ def seed_initial_superuser(*, recover=False):
 
         if crud.get_user_by_email(db, email):
             raise ValueError("Email ja cadastrado. Para uma conta superuser afetada pelo erro antigo, use --recover.")
-        payload = schemas.SetupPayload(
+        crud.initialize_setup(db, schemas.SetupPayload(
             superuser_email=email,
             superuser_password=read_password("Senha do superusuario: "),
-            tenant=schemas.InitialTenantCreate(
-                nome_denominacao=input("Nome da primeira denominacao: ").strip(),
-                admin_email=input("Email do administrador da denominacao (diferente): ").strip(),
-                admin_password=read_password("Senha do administrador da denominacao: "),
-            ),
-        )
-        crud.initialize_setup(db, payload)
-        print("Setup concluido: superusuario, denominacao e administrador criados.")
+        ))
+        print("Superusuario criado. Crie as denominacoes em /master/tenants (ou no painel master).")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Inicializa o financeiro sem credenciais fixas.")
+    parser = argparse.ArgumentParser(description="Inicializa o superusuario da plataforma sem credenciais fixas.")
     parser.add_argument("--recover", action="store_true", help="Recupera uma conta superuser criada pelo erro antigo.")
     args = parser.parse_args()
     try:
         seed_initial_superuser(recover=args.recover)
     except ValidationError:
-        print("Dados invalidos. Verifique os emails, o nome da denominacao e as senhas (minimo 12 caracteres).")
+        print("Dados invalidos. Verifique o email e a senha (minimo 12 caracteres).")
         return 1
     except IntegrityError:
-        print("Conflito de unicidade no banco. Verifique se ja existe superusuario, email ou denominacao cadastrado.")
+        print("Conflito de unicidade no banco. Verifique se ja existe superusuario ou email cadastrado.")
         return 1
     except ValueError as exc:
         print(str(exc))

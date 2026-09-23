@@ -235,17 +235,16 @@ class TokenData(BaseModel):
 # ... (final do arquivo)
 # --- Schemas do Painel Master (Superuser) ---
 
-class InitialTenantCreate(BaseModel):
-    """Schema para criar a primeira denominação durante o setup."""
+class TenantCreate(BaseModel):
+    """Schema para criar uma denominacao (tenant) e seu administrador."""
     nome_denominacao: str = Field(min_length=1)
     admin_email: EmailStr
     admin_password: str = Field(min_length=12)
 
 class SetupPayload(BaseModel):
-    """Schema completo para o payload do endpoint de setup."""
+    """Schema do setup inicial: cria apenas o superusuario da plataforma."""
     superuser_email: EmailStr
     superuser_password: str = Field(min_length=12)
-    tenant: InitialTenantCreate
 
 class TenantStats(BaseModel):
     """Estatísticas individuais de um tenant."""
