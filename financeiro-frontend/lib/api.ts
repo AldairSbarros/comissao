@@ -35,8 +35,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      if (typeof window !== 'undefined') {
+    if (error.response && error.response.status === 401 && typeof window !== 'undefined') {
+      const url: string = error.config?.url || '';
+      const isLoginAttempt = url.includes('/token');
+      // Só redireciona quando havia um token salvo (sessão expirada).
+      // Uma tentativa de login com senha errada (401 no /token) deve deixar o
+      // formulário mostrar o erro, não dar reload de volta para a tela de login.
+      if (!isLoginAttempt && localStorage.getItem("access_token")) {
         localStorage.removeItem("access_token");
         // Redirect "cru" do navegador: precisa incluir o basePath manualmente,
         // senão cai na raiz do domínio (ex.: landing page de outro site no mesmo domínio).
