@@ -528,6 +528,74 @@ def delete_congregacao_endpoint(
 
     crud.delete_congregacao(db=db, congregacao_id=congregacao_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+# --- Gestão de usuários dentro da denominação (admin de tenant) ---
+TENANT_ROLES = {"administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro"}
+
+@app.get("/denominacoes/{denominacao_id}/usuarios/", response_model=List[schemas.Usuario])
+def list_users_by_denominacao(
+    denominacao_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user)
+):
+    # Usuários da própria denominação ou administradores podem listar
+    if current_user.denominacao_id != denominacao_id and current_user.funcao != 'administrador':
+        raise HTTPException(status_code=403, detail="Acesso negado. Você não pertence a esta denominação.")
+    return crud.get_users(db, denominacao_id=denominacao_id)
+
+@app.post("/denominacoes/{denominacao_id}/usuarios/", response_model=schemas.Usuario, status_code=status.HTTP_201_CREATED)
+def create_user_in_denominacao(
+    denominacao_id: int,
+    user: schemas.UsuarioCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user)
+):
+    # Quem pode criar e com quais papéis:
+    # - administrador: qualquer papel de tenant, em qualquer denominação
+    # - supervisor_denominacao: supervisor_area e tesoureiro, na própria denominação
+    # - supervisor_area: apenas tesoureiro, na própria denominação e área
+    if current_user.funcao == 'administrador':
+        pass
+    elif current_user.funcao == 'supervisor_denominacao':
+        if current_user.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=403, detail="Acesso negado. Supervisores de denominação só podem criar usuários em sua própria denominação.")
+        if user.funcao in {'administrador', 'supervisor_denominacao'}:
+            raise HTTPException(status_code=403, detail="Acesso negado. Supervisores de denominação só podem criar supervisores de área e tesoureiros.")
+    elif current_user.funcao == 'supervisor_area':
+        if current_user.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=403, detail="Acesso negado. Supervisores de área só podem criar usuários em sua própria denominação.")
+        if user.funcao != 'tesoureiro':
+            raise HTTPException(status_code=403, detail="Acesso negado. Supervisores de área só podem criar tesoureiros.")
+    else:
+        raise HTTPException(status_code=403, detail="Acesso negado. Apenas administradores ou supervisores podem criar usuários.")
+
+    if user.is_superuser or user.funcao.strip().lower() == "superuser":
+        raise HTTPException(status_code=403, detail="Superusuario so pode ser criado pelo setup inicial ou seed.")
+    if user.funcao not in TENANT_ROLES:
+        raise HTTPException(status_code=400, detail="Funcao de usuario invalida.")
+
+    # O tenant é sempre o da URL
+    user.denominacao_id = denominacao_id
+
+    # Validação da hierarquia
+    if user.funcao == 'tesoureiro':
+        if not user.congregacao_id:
+            raise HTTPException(status_code=400, detail="Tesoureiros devem ser vinculados a uma congregação.")
+        db_congregacao = crud.get_congregacao_by_id(db, user.congregacao_id)
+        if not db_congregacao or db_congregacao.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=400, detail="Congregação inválida para esta denominação.")
+        if current_user.funcao == 'supervisor_area' and db_congregacao.area_id != current_user.area_id:
+            raise HTTPException(status_code=403, detail="Acesso negado. Supervisores de área só podem criar tesoureiros em congregações da sua área.")
+    elif user.funcao == 'supervisor_area':
+        if not user.area_id:
+            raise HTTPException(status_code=400, detail="Supervisores de área devem ser vinculados a uma área.")
+        db_area = crud.get_area_eclesiastica_by_id(db, user.area_id)
+        if not db_area or db_area.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=400, detail="Área inválida para esta denominação.")
+
+    if crud.get_user_by_email(db, email=user.email):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    return crud.create_user(db=db, user=user)
+
 @app.get("/users/me/", response_model=schemas.Usuario)
 def read_users_me(current_user: models.Usuario = Depends(get_current_user)):
     return current_user

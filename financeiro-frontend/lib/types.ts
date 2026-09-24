@@ -65,6 +65,7 @@ export interface Usuario {
   is_active?: boolean;
   denominacao_id?: number;
   denominacao?: { id: number; nome: string };
+  area_id?: number;
   congregacao_id?: number;
 }
 
@@ -109,6 +110,11 @@ export interface AreaEclesiasticaCreateData {
   denominacao_id: number;
 }
 
+export interface AreaEclesiasticaUpdateData {
+  nome?: string;
+  denominacao_id?: number;
+}
+
 export interface Congregacao {
   id: number;
   nome: string;
@@ -122,6 +128,13 @@ export interface CongregacaoCreateData {
   numero_co?: string;
   denominacao_id: number;
   area_id?: number;
+}
+
+export interface CongregacaoUpdateData {
+  nome?: string;
+  numero_co?: string | null;
+  area_id?: number | null;
+  denominacao_id?: number;
 }
 
 export interface UsuarioCreateData {

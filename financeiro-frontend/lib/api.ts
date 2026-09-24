@@ -2,8 +2,8 @@
 import axios, { AxiosInstance } from 'axios';
 import {
   Despesa, DespesaCreateData, Mes, Semana, Usuario, Denominacao,
-  DenominacaoCreateData, AreaEclesiastica, AreaEclesiasticaCreateData,
-  Congregacao, CongregacaoCreateData, UsuarioCreateData, DizimistaOfertante,
+  DenominacaoCreateData, AreaEclesiastica, AreaEclesiasticaCreateData, AreaEclesiasticaUpdateData,
+  Congregacao, CongregacaoCreateData, CongregacaoUpdateData, UsuarioCreateData, DizimistaOfertante,
   DizimistaOfertanteCreateData, DizimistaOfertanteUpdateData, Renda,
   RendaCreateData, AnaliseMes, UserPasswordReset, UserStatusUpdate, TenantRename
 } from "./types";
@@ -137,20 +137,50 @@ export const listarDenominacoes = async (): Promise<Denominacao[]> => {
     const response = await api.get("/denominacoes/");
     return response.data;
 }
+export const getDenominacao = async (denominacaoId: number): Promise<Denominacao> => {
+    const response = await api.get(`/denominacoes/${denominacaoId}`);
+    return response.data;
+}
 export const criarArea = async (areaData: AreaEclesiasticaCreateData): Promise<AreaEclesiastica> => {
     const response = await api.post("/areas_eclesiasticas/", areaData);
     return response.data;
 }
+export const atualizarArea = async (areaId: number, areaData: AreaEclesiasticaUpdateData): Promise<AreaEclesiastica> => {
+    const response = await api.put(`/areas_eclesiasticas/${areaId}`, areaData);
+    return response.data;
+}
+export const removerArea = async (areaId: number): Promise<void> => {
+    await api.delete(`/areas_eclesiasticas/${areaId}`);
+}
 export const listarAreasPorDenominacao = async (denominacaoId: number): Promise<AreaEclesiastica[]> => {
     const response = await api.get(`/denominacoes/${denominacaoId}/areas/`);
+    return response.data;
+}
+export const listarCongregacoesPorDenominacao = async (denominacaoId: number): Promise<Congregacao[]> => {
+    const response = await api.get(`/denominacoes/${denominacaoId}/congregacoes/`);
     return response.data;
 }
 export const criarCongregacao = async (congregacaoData: CongregacaoCreateData): Promise<Congregacao> => {
     const response = await api.post("/congregacoes/", congregacaoData);
     return response.data;
 }
+export const atualizarCongregacao = async (congregacaoId: number, congregacaoData: CongregacaoUpdateData): Promise<Congregacao> => {
+    const response = await api.put(`/congregacoes/${congregacaoId}`, congregacaoData);
+    return response.data;
+}
+export const removerCongregacao = async (congregacaoId: number): Promise<void> => {
+    await api.delete(`/congregacoes/${congregacaoId}`);
+}
 export const criarUsuario = async (userData: UsuarioCreateData): Promise<Usuario> => {
     const response = await api.post("/usuarios/", userData);
+    return response.data;
+}
+export const listarUsuariosPorDenominacao = async (denominacaoId: number): Promise<Usuario[]> => {
+    const response = await api.get(`/denominacoes/${denominacaoId}/usuarios/`);
+    return response.data;
+}
+export const criarUsuarioNaDenominacao = async (denominacaoId: number, userData: Omit<UsuarioCreateData, "denominacao_id">): Promise<Usuario> => {
+    const response = await api.post(`/denominacoes/${denominacaoId}/usuarios/`, userData);
     return response.data;
 }
 export const baixarBackup = async (): Promise<string> => {
