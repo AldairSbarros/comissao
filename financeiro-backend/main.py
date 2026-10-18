@@ -90,6 +90,8 @@ def verificar_acesso_congregacao(current_user: models.Usuario, congregacao: mode
         return
     if current_user.funcao == 'tesoureiro' and current_user.congregacao_id == congregacao.id:
         return
+    if current_user.funcao == 'dirigente' and current_user.congregacao_id == congregacao.id:
+        return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Acesso negado. Você não tem permissão para acessar os dados financeiros desta congregação."
@@ -553,7 +555,7 @@ def delete_congregacao_endpoint(
     crud.delete_congregacao(db=db, congregacao_id=congregacao_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 # --- Gestão de usuários dentro da denominação (admin de tenant) ---
-TENANT_ROLES = {"administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro"}
+TENANT_ROLES = {"administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro", "dirigente"}
 
 @app.get("/denominacoes/{denominacao_id}/usuarios/", response_model=List[schemas.Usuario])
 def list_users_by_denominacao(
@@ -1097,6 +1099,72 @@ def gerar_balancete_pdf(mes_id: int, db: Session = Depends(get_db), current_user
 
     return Response(content=bytes(pdf_output), media_type='application/pdf', headers={'Content-Disposition': f'attachment; filename="balancete_{db_mes.nome.replace("/", "-")}.pdf"'})
 
+@app.get("/meses/{mes_id}/dizimistas/pdf")
+def gerar_dizimistas_pdf(mes_id: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
+    """Gera PDF com lista de dizimistas/ofertantes do mês (sem valores)."""
+    db_mes = db.query(models.Mes).options(joinedload(models.Mes.congregacao).joinedload(models.Congregacao.area).joinedload(models.AreaEclesiastica.denominacao)).filter(models.Mes.id == mes_id).first()
+    if not db_mes: raise HTTPException(status_code=404, detail="Mês não encontrado.")
+    verificar_acesso_congregacao(current_user, db_mes.congregacao)
+
+    congregacao = db_mes.congregacao
+    area = congregacao.area if congregacao else None
+    denominacao = area.denominacao if area else None
+
+    # Buscar todas as rendas do mês com dizimista_ofertante_id, ordenadas por data
+    rendas_com_dizimista = (
+        db.query(models.Renda)
+        .options(joinedload(models.Renda.dizimista_ofertante))
+        .filter(
+            models.Renda.semana_id.in_(
+                db.query(models.Semana.id).filter(models.Semana.mes_id == mes_id)
+            ),
+            models.Renda.dizimista_ofertante_id.isnot(None)
+        )
+        .order_by(models.Renda.data_registro)
+        .all()
+    )
+
+    # Instanciar PDF
+    pdf = PDF('P', 'mm', 'A4',
+              denominacao_nome=denominacao.nome if denominacao else "N/A",
+              area_nome=area.nome if area else "N/A",
+              congregacao_nome=congregacao.nome if congregacao else "N/A",
+              usuario_email=current_user.email,
+              usuario_funcao=current_user.funcao)
+
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, f"Lista de Dizimistas e Ofertantes", 0, 1, 'C')
+    pdf.ln(5)
+
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 6, f"Congregação: {congregacao.nome if congregacao else 'N/A'}", 0, 1, 'L')
+    pdf.cell(0, 6, f"Mês: {db_mes.nome}", 0, 1, 'L')
+    pdf.cell(0, 6, f"Gerado em: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 1, 'L')
+    pdf.ln(5)
+
+    # Cabeçalho da tabela
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(80, 7, "Nome", 1, 0, 'C')
+    pdf.cell(50, 7, "Nº Recibo", 1, 0, 'C')
+    pdf.cell(50, 7, "Data", 1, 1, 'C')
+    pdf.set_font('Arial', '', 9)
+
+    # Linhas de dados
+    for renda in rendas_com_dizimista:
+        nome = renda.dizimista_ofertante.nome if renda.dizimista_ofertante else "Não Identificado"
+        recibo = renda.numero_recibo or "N/A"
+        data_str = renda.data_registro.strftime('%d/%m/%Y') if renda.data_registro else "N/A"
+
+        pdf.cell(80, 6, nome, 1, 0, 'L')
+        pdf.cell(50, 6, recibo, 1, 0, 'C')
+        pdf.cell(50, 6, data_str, 1, 1, 'C')
+
+    pdf_output = pdf.output(dest='S')
+
+    nome_arquivo = f"dizimistas_{congregacao.nome.replace(' ', '_')}_{db_mes.nome.replace('/', '-')}.pdf" if congregacao else f"dizimistas_mes_{mes_id}.pdf"
+    return Response(content=bytes(pdf_output), media_type='application/pdf', headers={'Content-Disposition': f'attachment; filename="{nome_arquivo}"'})
+
 @app.post("/backup/")
 def gerar_backup(current_user: models.Usuario = Depends(get_current_user)):
     # Apenas administradores podem fazer backup
@@ -1253,6 +1321,9 @@ def adicionar_semana_endpoint(mes_id: int, semana: schemas.SemanaCreate, db: Ses
 
 @app.post("/meses/{mes_id}/semanas/{semana_numero}/despesas/", response_model=schemas.Despesa)
 def adicionar_despesa_endpoint(mes_id: int, semana_numero: int, despesa: schemas.DespesaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
+    # Dirigente NÃO pode POST despesas — só GET
+    if current_user.funcao == 'dirigente':
+        raise HTTPException(status_code=403, detail="Acesso negado. O papel dirigente só tem permissão de leitura.")
     db_semana = db.query(models.Semana).filter_by(mes_id=mes_id, numero=semana_numero).first()
     if not db_semana: raise HTTPException(status_code=404, detail="Semana não encontrada.")
     verificar_acesso_congregacao(current_user, db_semana.mes.congregacao)

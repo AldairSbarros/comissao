@@ -129,6 +129,11 @@ export const getBalancetePdfUrl = async (mesId: number): Promise<string> => {
     const blob = new Blob([response.data], { type: 'application/pdf' });
     return URL.createObjectURL(blob);
 }
+export const getDizimistasPdfUrl = async (mesId: number): Promise<string> => {
+    const response = await api.get(`/meses/${mesId}/dizimistas/pdf`, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
+}
 export const criarDenominacao = async (denominacaoData: DenominacaoCreateData): Promise<Denominacao> => {
     const response = await api.post("/denominacoes/", denominacaoData);
     return response.data;

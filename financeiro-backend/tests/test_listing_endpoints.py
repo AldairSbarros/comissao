@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 import pytest
+import crud, schemas, models
 
 
 def test_list_denominacoes(client: TestClient, setup_data: dict):
@@ -106,3 +107,107 @@ def test_list_congregacoes_by_denominacao_unauthorized(client: TestClient, setup
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "Acesso negado. Você não pertence a esta denominação."
+
+
+def test_dirigente_get_meses_ok(client: TestClient, setup_data: dict, db_session: Session):
+    """Dirigente pode GET meses da própria congregação."""
+    # Criar usuário dirigente
+    congregacao = setup_data["congregacoes"]["congregacao1_area1"]
+    password = "testpassword"
+    user_dirigente = crud.create_user(db_session, schemas.UsuarioCreate(
+        email="dirigente@example.com", password=password, funcao="dirigente",
+        denominacao_id=setup_data["denominacoes"]["denominacao1"].id,
+        area_id=setup_data["areas"]["area1_denominacao1"].id,
+        congregacao_id=congregacao.id
+    ))
+    # Gerar token
+    from datetime import timedelta
+    import security
+    access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    token_dirigente = security.create_access_token(
+        data={"sub": user_dirigente.email, "funcao": user_dirigente.funcao,
+              "denominacao_id": user_dirigente.denominacao_id,
+              "area_id": user_dirigente.area_id,
+              "congregacao_id": user_dirigente.congregacao_id},
+        expires_delta=access_token_expires
+    )
+
+    # O endpoint correto é /congregacoes/{id}/meses/
+    response = client.get(
+        f"/congregacoes/{congregacao.id}/meses/",
+        headers={"Authorization": f"Bearer {token_dirigente}"}
+    )
+    assert response.status_code == 200
+
+
+def test_dirigente_post_despesa_forbidden(client: TestClient, setup_data: dict, db_session: Session):
+    """Dirigente NÃO pode POST despesas (403)."""
+    congregacao = setup_data["congregacoes"]["congregacao1_area1"]
+    password = "testpassword"
+    user_dirigente = crud.create_user(db_session, schemas.UsuarioCreate(
+        email="dirigente2@example.com", password=password, funcao="dirigente",
+        denominacao_id=setup_data["denominacoes"]["denominacao1"].id,
+        area_id=setup_data["areas"]["area1_denominacao1"].id,
+        congregacao_id=congregacao.id
+    ))
+    from datetime import timedelta
+    import security
+    access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    token_dirigente = security.create_access_token(
+        data={"sub": user_dirigente.email, "funcao": user_dirigente.funcao,
+              "denominacao_id": user_dirigente.denominacao_id,
+              "area_id": user_dirigente.area_id,
+              "congregacao_id": user_dirigente.congregacao_id},
+        expires_delta=access_token_expires
+    )
+    # Criar mês e semana para associar despesa
+    mes = models.Mes(congregacao_id=congregacao.id, nome="Fevereiro/2026", saldo_inicial=0.0)
+    db_session.add(mes)
+    db_session.flush()
+    semana = models.Semana(numero=1, mes_id=mes.id, saldo_inicial_semana=0.0)
+    db_session.add(semana)
+    db_session.flush()
+    semana_id = semana.id
+    db_session.commit()
+
+    # O endpoint correto é /meses/{mes_id}/semanas/{semana_numero}/despesas/
+    response = client.post(
+        f"/meses/{mes.id}/semanas/{semana.numero}/despesas/",
+        json={"descricao": "Teste", "valor": 100.0},
+        headers={"Authorization": f"Bearer {token_dirigente}"}
+    )
+    assert response.status_code == 403
+
+
+def test_dirigente_delete_dizimista_forbidden(client: TestClient, setup_data: dict, db_session: Session):
+    """Dirigente NÃO pode DELETE dizimistas (403)."""
+    congregacao = setup_data["congregacoes"]["congregacao1_area1"]
+    password = "testpassword"
+    user_dirigente = crud.create_user(db_session, schemas.UsuarioCreate(
+        email="dirigente3@example.com", password=password, funcao="dirigente",
+        denominacao_id=setup_data["denominacoes"]["denominacao1"].id,
+        area_id=setup_data["areas"]["area1_denominacao1"].id,
+        congregacao_id=congregacao.id
+    ))
+    from datetime import timedelta
+    import security
+    access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    token_dirigente = security.create_access_token(
+        data={"sub": user_dirigente.email, "funcao": user_dirigente.funcao,
+              "denominacao_id": user_dirigente.denominacao_id,
+              "area_id": user_dirigente.area_id,
+              "congregacao_id": user_dirigente.congregacao_id},
+        expires_delta=access_token_expires
+    )
+    # Criar dizimista
+    dizimista = models.DizimistaOfertante(nome="Teste", congregacao_id=congregacao.id)
+    db_session.add(dizimista)
+    db_session.flush()
+    dizimista_id = dizimista.id
+    db_session.commit()
+
+    response = client.delete(
+        f"/dizimistas/{dizimista_id}",
+        headers={"Authorization": f"Bearer {token_dirigente}"}
+    )
+    assert response.status_code == 403

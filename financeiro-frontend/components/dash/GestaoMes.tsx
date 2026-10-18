@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { 
-  listarMeses, 
-  fecharMes, 
-  reabrirMes, 
-  getBalancetePdfUrl, 
+import {
+  listarMeses,
+  fecharMes,
+  reabrirMes,
+  getBalancetePdfUrl,
+  getDizimistasPdfUrl,
   adicionarSemana,
   adicionarRenda,
   removerRenda,
@@ -30,8 +31,8 @@ import { RendaForm } from "@/components/forms/RendaForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// Nova importação do componente de análise de mês
-import  AnaliseMes  from "@/components/analise/AnaliseMes";
+// Nova importação do componente de análise de mês (versão completa do dash)
+import AnaliseMes from "@/components/dash/AnaliseMes";
 
 export default function GestaoMes() {
   const { user } = useAuth();
@@ -226,7 +227,17 @@ export default function GestaoMes() {
                         </div>
                         <div className="flex flex-col gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(mes.id)}>
-                            <FileDown className="h-4 w-4 mr-2" /> Gerar PDF
+                            <FileDown className="h-4 w-4 mr-2" /> Balancete (PDF)
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={async () => {
+                            try {
+                              const url = await getDizimistasPdfUrl(mes.id);
+                              window.open(url, '_blank');
+                            } catch (err) {
+                              toast.error("Erro ao gerar PDF de dizimistas.");
+                            }
+                          }}>
+                            <FileDown className="h-4 w-4 mr-2" /> Lista de Dizimistas (PDF)
                           </Button>
                           {mes.fechado ? (
                             user?.funcao === 'administrador' && (
@@ -258,6 +269,8 @@ export default function GestaoMes() {
                                 <div className="text-right text-sm">
                                   <p className="text-green-600 font-semibold">+ Rendas: R$ {semana.renda_semanal.toFixed(2)}</p>
                                   <p className="text-red-600 font-semibold">- Despesas: R$ {semana.despesas.reduce((acc, curr) => acc + curr.valor, 0).toFixed(2)}</p>
+                                  <p className="text-blue-600 font-semibold">Comissão (33%): R$ {semana.comissao?.toFixed(2)}</p>
+                                  <p className="text-purple-600 font-semibold">Saldo inicial: R$ {semana.saldo_inicial_semana?.toFixed(2)}</p>
                                   <p className="font-bold border-t border-border mt-1 pt-1">Fim: R$ {semana.saldo_final_semana.toFixed(2)}</p>
                                 </div>
                               </CardHeader>
@@ -377,7 +390,13 @@ export default function GestaoMes() {
               <Button variant="ghost" size="sm" onClick={fecharAnalise}>Fechar</Button>
             </CardHeader>
             <CardContent>
-              <AnaliseMes mesId={mesIdParaAnalise} />
+              <AnaliseMes
+                mesId={mesIdParaAnalise}
+                nomeMes={meses.find(m => m.id === mesIdParaAnalise)?.nome || ''}
+                fechado={meses.find(m => m.id === mesIdParaAnalise)?.fechado || false}
+                saldoInicial={meses.find(m => m.id === mesIdParaAnalise)?.saldo_inicial || 0}
+                saldoFinal={meses.find(m => m.id === mesIdParaAnalise)?.saldo_final || 0}
+              />
             </CardContent>
           </Card>
         </div>
