@@ -1,0 +1,29 @@
+﻿Aba;Celula;Tipo;Recibo;Contribuinte/Descricao;Valor;Data original;Data corrigida;Confianca;Como foi deduzida
+C09-08-26;F71;Oferta;18643;Ofertas Pix;120,00;2026-04-02;2026-08-02;ALTA;R1 corrige o mes (dia preservado) [confere com recibo 18642..18644]
+C09-09-26;F73;Oferta;18708;Missão Kids;11,45;2026-07-06;2026-09-06;ALTA;R1 corrige o mes (dia preservado) [confere com recibo 18707..18709]
+C13-02-26;F58;Oferta;;;35,00;(vazio);2026-02-20;MEDIA;R5 entre os vizinhos 2026-02-17 e 2026-02-24
+C17-01-26;G8;Dizimo;203401;Arnaldo Bezerra;43,25;04/01/;2026-01-04;ALTA;R3 texto incompleto '04/01/' completado para o ano/mes da aba
+C17-03-26;G9;Dizimo;203444;Kimoly Nina;8,00;2026-08-03;2026-03-03;ALTA;R1 corrige o mes (dia preservado) [confere com recibo 203443..203445]
+C17-07-26;F64;Oferta;;Culto de Celebração;15,80;(vazio);2026-07-05;BAIXA;R5 repete a ultima data conhecida do bloco (2026-07-05)
+C17-07-26;F65;Oferta;;Culto de Doutrina;5,00;(vazio);2026-07-05;BAIXA;R5 repete a ultima data conhecida do bloco (2026-07-05)
+C17-07-26;F66;Oferta;;Culto de Aniversario;75,00;(vazio);2026-07-05;BAIXA;R5 repete a ultima data conhecida do bloco (2026-07-05)
+C17-07-26;F67;Oferta;;Culto de Domingo;55,00;(vazio);2026-07-05;BAIXA;R5 repete a ultima data conhecida do bloco (2026-07-05)
+C9-02-26;G30;Dizimo;33383;Ana Clara Sabino;15,00;(vazio);2026-02-15;ALTA;R4 interpolado entre recibo 33382 (2026-02-15) e 33384 (2026-02-15)
+C9-02-26;F53;Oferta;;;51,00;(vazio);2026-02-04;MEDIA;R5 entre os vizinhos 2026-02-01 e 2026-02-08
+C9-02-26;F54;Oferta;;;60,00;(vazio);2026-02-04;MEDIA;R5 entre os vizinhos 2026-02-01 e 2026-02-08
+C9-02-26;F59;Oferta;;Culto de Doutrina;27,00;(vazio);2026-02-18;MEDIA;R5 entre os vizinhos 2026-02-15 e 2026-02-22
+C9-02-26;F60;Oferta;;;8,00;1900-01-21;2026-02-18;MEDIA;R5 entre os vizinhos 2026-02-15 e 2026-02-22
+C9-04-3-26;G7;Dizimo;33493;Miracelma;1,00;2026-01-03;2026-04-03;ALTA;R1 corrige o mes (dia preservado) [confere com recibo 33492..33494]
+C9-05-26;G49;Dizimo;;Maria José;240,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G50;Dizimo;;Williame Nery;235,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G51;Dizimo;;Alex Martins;194,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G52;Dizimo;;Maria Ferreira;2,70;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G53;Dizimo;;Rozalha Araújo;20,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G54;Dizimo;;Maria Íris;400,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G55;Dizimo;;Francisco Arcos;1040,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G56;Dizimo;;Thiago Campelo;748,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G57;Dizimo;;Maria Silvane;260,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G58;Dizimo;;Cleidineia;50,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G59;Dizimo;;Deuzete Aquino;156,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;G60;Dizimo;;Marly Santos;60,00;(vazio);2026-05-28;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-28)
+C9-05-26;F83;Oferta;;Culto de Celebração;29,50;(vazio);2026-05-31;BAIXA;R5 repete a ultima data conhecida do bloco (2026-05-31)
