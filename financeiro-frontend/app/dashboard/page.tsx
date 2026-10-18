@@ -39,7 +39,7 @@ export default function DashboardPage() {
     return null; // Redirecionamento em andamento
   }
 
-  const ehTesoureiro = user.funcao === "tesoureiro" || (user.congregacao_id != null && !FUNCOES_ADMINISTRATIVAS.includes(user.funcao));
+  const ehTesoureiro = user.funcao === "tesoureiro" || user.funcao === "dirigente" || (user.congregacao_id != null && !FUNCOES_ADMINISTRATIVAS.includes(user.funcao));
   const titulo = ehTesoureiro ? "Painel do Tesoureiro" : "Painel Administrativo";
 
   return (

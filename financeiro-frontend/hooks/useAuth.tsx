@@ -9,7 +9,7 @@ import { jwtDecode } from 'jwt-decode';
 // Definição da interface para o usuário extraído do token JWT
 export interface AuthUser {
   sub: string; // O e-mail do usuário
-  funcao: string;
+  funcao: string; // "administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro", "dirigente"
   is_superuser: boolean;
   denominacao_id?: number;
   area_id?: number;

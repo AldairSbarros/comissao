@@ -77,7 +77,7 @@ def verificar_acesso_congregacao(current_user: models.Usuario, congregacao: mode
     """
     Checagem POSITIVA de autorização para dados financeiros de uma congregação.
     Só libera quem pertence à cadeia da congregação: superuser, administrador,
-    supervisor da mesma denominação, supervisor da mesma área ou tesoureiro da
+    supervisor da mesma denominação, supervisor da mesma área, tesoureiro ou dirigente da
     própria congregação. Qualquer outro caso é bloqueado (nega por padrão).
     """
     if current_user.is_superuser:
@@ -88,9 +88,10 @@ def verificar_acesso_congregacao(current_user: models.Usuario, congregacao: mode
         return
     if current_user.funcao == 'supervisor_area' and current_user.area_id == congregacao.area_id:
         return
-    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id == congregacao.id:
-        return
+    # Dirigente tem acesso de leitura (GET) à sua congregação
     if current_user.funcao == 'dirigente' and current_user.congregacao_id == congregacao.id:
+        return
+    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id == congregacao.id:
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -861,6 +862,10 @@ def delete_renda_endpoint(
         raise HTTPException(status_code=404, detail="Renda não encontrada.")
 
     verificar_acesso_congregacao(current_user, db_renda.congregacao)
+
+    # Dirigente tem acesso apenas de leitura — POST/PUT/DELETE são negados
+    if current_user.funcao == 'dirigente':
+        raise HTTPException(status_code=403, detail="Acesso negado. Dirigentes podem apenas visualizar dados financeiros.")
 
     if db_renda.semana.mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível deletar rendas de um mês fechado.")
