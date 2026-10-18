@@ -16,6 +16,7 @@ import shutil
 from fastapi import UploadFile, File
 
 import crud, models, schemas, security
+import importador
 from database import get_db, engine
 from migrations import apply_migrations
 
@@ -284,6 +285,7 @@ def delete_tenant_endpoint(tenant_id: int, db: Session = Depends(get_db)):
 
 # --- Registrar o Router do Painel Master ---
 app.include_router(master_router)
+app.include_router(importador.router)
 
 # --- Endpoints de Setup e Usuários ---
 @app.post("/usuarios/", response_model=schemas.Usuario)
