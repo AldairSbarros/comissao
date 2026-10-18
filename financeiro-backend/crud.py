@@ -45,9 +45,9 @@ def update_denominacao_status(db: Session, denominacao_id: int, is_active: bool)
     db_denominacao = get_denominacao_by_id(db, denominacao_id)
     if db_denominacao:
         db_denominacao.is_active = is_active
-    db.add(db_denominacao)
-    db.commit()
-    db.refresh(db_denominacao)
+        db.add(db_denominacao)
+        db.commit()
+        db.refresh(db_denominacao)
     return db_denominacao
 
 def get_areas_eclesiasticas_by_denominacao(
@@ -75,10 +75,10 @@ def update_area_eclesiastica(db: Session, area_id: int, area: schemas.AreaEclesi
     if db_area:
         update_data = area.model_dump(exclude_unset=True)
         for key, value in update_data.items():
-                    setattr(db_area, key, value)
-    db.add(db_area)
-    db.commit()
-    db.refresh(db_area)
+            setattr(db_area, key, value)
+        db.add(db_area)
+        db.commit()
+        db.refresh(db_area)
     return db_area
 
 def delete_area_eclesiastica(db: Session, area_id: int):

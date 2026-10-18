@@ -7,6 +7,8 @@ services:
       context: ./financeiro-backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
     ports:
       - "8001:8000"
     volumes:

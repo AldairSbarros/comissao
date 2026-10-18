@@ -72,6 +72,28 @@ def get_current_superuser(current_user: models.Usuario = Depends(get_current_use
         )
     return current_user
 
+def verificar_acesso_congregacao(current_user: models.Usuario, congregacao: models.Congregacao):
+    """
+    Checagem POSITIVA de autorização para dados financeiros de uma congregação.
+    Só libera quem pertence à cadeia da congregação: superuser, administrador,
+    supervisor da mesma denominação, supervisor da mesma área ou tesoureiro da
+    própria congregação. Qualquer outro caso é bloqueado (nega por padrão).
+    """
+    if current_user.is_superuser:
+        return
+    if current_user.funcao == 'administrador':
+        return
+    if current_user.funcao == 'supervisor_denominacao' and current_user.denominacao_id == congregacao.denominacao_id:
+        return
+    if current_user.funcao == 'supervisor_area' and current_user.area_id == congregacao.area_id:
+        return
+    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id == congregacao.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Acesso negado. Você não tem permissão para acessar os dados financeiros desta congregação."
+    )
+
 @app.post("/token", response_model=schemas.Token)
 def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
     user = crud.get_user_by_email(db, email=form_data.username)
@@ -616,8 +638,13 @@ def update_user_password(
 # --- Endpoints de Listagem ---
 @app.get("/denominacoes/", response_model=List[schemas.Denominacao])
 def list_denominacoes(db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
-    # Qualquer usuário autenticado pode listar denominações
-    return crud.get_denominacoes(db)
+    # Superuser e administrador veem todas as denominações; qualquer outro papel só vê a própria.
+    if current_user.is_superuser or current_user.funcao == 'administrador':
+        return crud.get_denominacoes(db)
+    if current_user.denominacao_id is None:
+        return []
+    db_denominacao = crud.get_denominacao_by_id(db, current_user.denominacao_id)
+    return [db_denominacao] if db_denominacao else []
 
 @app.get("/denominacoes/{denominacao_id}/areas/", response_model=List[schemas.AreaEclesiastica])
 def list_areas_by_denominacao(
@@ -689,9 +716,10 @@ def list_dizimistas_by_congregacao_endpoint(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user)
 ):
-    # Apenas usuários da congregação (ou superiores) podem listar dizimistas
-    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id != congregacao_id:
-        raise HTTPException(status_code=403, detail="Tesoureiros só podem listar dizimistas de sua própria congregação.")
+    db_congregacao = crud.get_congregacao_by_id(db, congregacao_id)
+    if not db_congregacao:
+        raise HTTPException(status_code=404, detail="Congregação não encontrada.")
+    verificar_acesso_congregacao(current_user, db_congregacao)
 
     return crud.get_dizimistas_ofertantes_by_congregacao(db=db, congregacao_id=congregacao_id)
 
@@ -709,7 +737,7 @@ def update_dizimista_ofertante_endpoint(
     # Lógica de autorização para atualização
     if current_user.funcao == 'administrador':
         pass # Administrador tem acesso total
-    elif current_user.funcao == 'supervisor_denominacao' and db_dizimista.congregacao.area.denominacao_id == current_user.denominacao_id:
+    elif current_user.funcao == 'supervisor_denominacao' and db_dizimista.congregacao.denominacao_id == current_user.denominacao_id:
         pass # Supervisor de denominação pode atualizar dizimistas da sua denominação
     elif current_user.funcao == 'supervisor_area' and db_dizimista.congregacao.area_id == current_user.area_id:
         pass # Supervisor de área pode atualizar dizimistas da sua área
@@ -733,7 +761,7 @@ def delete_dizimista_ofertante_endpoint(
     # Lógica de autorização para exclusão
     if current_user.funcao == 'administrador':
         pass # Administrador tem acesso total
-    elif current_user.funcao == 'supervisor_denominacao' and db_dizimista.congregacao.area.denominacao_id == current_user.denominacao_id:
+    elif current_user.funcao == 'supervisor_denominacao' and db_dizimista.congregacao.denominacao_id == current_user.denominacao_id:
         pass # Supervisor de denominação pode deletar dizimistas da sua denominação
     elif current_user.funcao == 'supervisor_area' and db_dizimista.congregacao.area_id == current_user.area_id:
         pass # Supervisor de área pode deletar dizimistas da sua área
@@ -759,7 +787,7 @@ def get_dizimista_ofertante_endpoint(
     # Lógica de autorização
     if current_user.funcao == 'administrador':
         pass # Administrador tem acesso total
-    elif current_user.funcao == 'supervisor_denominacao' and db_dizimista.congregacao.area.denominacao_id == current_user.denominacao_id:
+    elif current_user.funcao == 'supervisor_denominacao' and db_dizimista.congregacao.denominacao_id == current_user.denominacao_id:
         pass # Supervisor de denominação pode ver dizimistas da sua denominação
     elif current_user.funcao == 'supervisor_area' and db_dizimista.congregacao.area_id == current_user.area_id:
         pass # Supervisor de área pode ver dizimistas da sua área
@@ -782,9 +810,7 @@ def create_renda_endpoint(
     if not db_semana:
         raise HTTPException(status_code=404, detail="Semana não encontrada.")
 
-    # Apenas usuários da congregação (ou superiores) podem criar rendas
-    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id != db_semana.mes.congregacao_id:
-        raise HTTPException(status_code=403, detail="Tesoureiros só podem criar rendas em sua própria congregação.")
+    verificar_acesso_congregacao(current_user, db_semana.mes.congregacao)
 
     if db_semana.mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível adicionar rendas a um mês fechado.")
@@ -816,9 +842,7 @@ def list_rendas_by_semana_endpoint(
     if not db_semana:
         raise HTTPException(status_code=404, detail="Semana não encontrada.")
 
-    # Apenas usuários da congregação (ou superiores) podem listar rendas
-    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id != db_semana.mes.congregacao_id:
-        raise HTTPException(status_code=403, detail="Tesoureiros só podem listar rendas de sua própria congregação.")
+    verificar_acesso_congregacao(current_user, db_semana.mes.congregacao)
 
     return crud.get_rendas_by_semana(db=db, semana_id=semana_id)
 
@@ -832,9 +856,7 @@ def delete_renda_endpoint(
     if not db_renda:
         raise HTTPException(status_code=404, detail="Renda não encontrada.")
 
-    # Apenas usuários da congregação (ou superiores) podem deletar rendas
-    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id != db_renda.congregacao_id:
-        raise HTTPException(status_code=403, detail="Tesoureiros só podem deletar rendas de sua própria congregação.")
+    verificar_acesso_congregacao(current_user, db_renda.congregacao)
 
     if db_renda.semana.mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível deletar rendas de um mês fechado.")
@@ -857,7 +879,7 @@ def get_renda_endpoint(
     # Lógica de autorização
     if current_user.funcao == 'administrador':
         pass # Administrador tem acesso total
-    elif current_user.funcao == 'supervisor_denominacao' and db_renda.congregacao.area.denominacao_id == current_user.denominacao_id:
+    elif current_user.funcao == 'supervisor_denominacao' and db_renda.congregacao.denominacao_id == current_user.denominacao_id:
         pass # Supervisor de denominação pode ver rendas da sua denominação
     elif current_user.funcao == 'supervisor_area' and db_renda.congregacao.area_id == current_user.area_id:
         pass # Supervisor de área pode ver rendas da sua área
@@ -882,7 +904,7 @@ def update_renda_endpoint(
     # Lógica de autorização para atualização
     if current_user.funcao == 'administrador':
         pass # Administrador tem acesso total
-    elif current_user.funcao == 'supervisor_denominacao' and db_renda.congregacao.area.denominacao_id == current_user.denominacao_id:
+    elif current_user.funcao == 'supervisor_denominacao' and db_renda.congregacao.denominacao_id == current_user.denominacao_id:
         pass # Supervisor de denominação pode atualizar rendas da sua denominação
     elif current_user.funcao == 'supervisor_area' and db_renda.congregacao.area_id == current_user.area_id:
         pass # Supervisor de área pode atualizar rendas da sua área
@@ -968,8 +990,7 @@ def formatar_moeda(valor):
 def gerar_balancete_pdf(mes_id: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
     db_mes = db.query(models.Mes).options(joinedload(models.Mes.congregacao).joinedload(models.Congregacao.area).joinedload(models.AreaEclesiastica.denominacao)).filter(models.Mes.id == mes_id).first()
     if not db_mes: raise HTTPException(status_code=404, detail="Mês não encontrado.")
-    if current_user.congregacao_id != db_mes.congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    verificar_acesso_congregacao(current_user, db_mes.congregacao)
 
     congregacao = db_mes.congregacao
     area = congregacao.area if congregacao else None
@@ -1157,15 +1178,19 @@ def recalcular_saldos_mes(db: Session, mes_id: int):
 
 @app.get("/congregacoes/{congregacao_id}/meses/", response_model=List[schemas.Mes])
 def listar_meses_congregacao(congregacao_id: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
-    if current_user.congregacao_id != congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    db_congregacao = crud.get_congregacao_by_id(db, congregacao_id)
+    if not db_congregacao:
+        raise HTTPException(status_code=404, detail="Congregação não encontrada.")
+    verificar_acesso_congregacao(current_user, db_congregacao)
     meses = db.query(models.Mes).options(joinedload(models.Mes.semanas).joinedload(models.Semana.despesas)).filter(models.Mes.congregacao_id == congregacao_id).order_by(models.Mes.id.desc()).all()
     return meses
 
 @app.post("/meses/", response_model=schemas.Mes, status_code=status.HTTP_201_CREATED)
 def criar_mes_endpoint(mes: schemas.MesCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
-    if current_user.congregacao_id != mes.congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    db_congregacao = crud.get_congregacao_by_id(db, mes.congregacao_id)
+    if not db_congregacao:
+        raise HTTPException(status_code=404, detail="Congregação não encontrada.")
+    verificar_acesso_congregacao(current_user, db_congregacao)
     return crud.create_mes(db=db, mes=mes)
 
 @app.put("/meses/{mes_id}/fechar", response_model=schemas.Mes)
@@ -1173,8 +1198,7 @@ def fechar_mes_endpoint(mes_id: int, db: Session = Depends(get_db), current_user
     db_mes = db.query(models.Mes).filter(models.Mes.id == mes_id).first()
     if not db_mes:
         raise HTTPException(status_code=404, detail="Mês não encontrado.")
-    if current_user.congregacao_id != db_mes.congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    verificar_acesso_congregacao(current_user, db_mes.congregacao)
 
     db_mes.fechado = True
     db.commit()
@@ -1198,6 +1222,10 @@ def reabrir_mes_endpoint(mes_id: int, db: Session = Depends(get_db), current_use
 
 @app.get("/meses/{mes_id}/semanas/", response_model=List[schemas.Semana])
 def listar_semanas(mes_id: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
+    db_mes = db.query(models.Mes).filter(models.Mes.id == mes_id).first()
+    if not db_mes: raise HTTPException(status_code=404, detail="Mês não encontrado.")
+    verificar_acesso_congregacao(current_user, db_mes.congregacao)
+
     semanas = db.query(models.Semana).options(joinedload(models.Semana.despesas)).filter(models.Semana.mes_id == mes_id).order_by(models.Semana.numero).all()
     return semanas
 
@@ -1205,8 +1233,7 @@ def listar_semanas(mes_id: int, db: Session = Depends(get_db), current_user: mod
 def adicionar_semana_endpoint(mes_id: int, semana: schemas.SemanaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
     db_mes = db.query(models.Mes).options(joinedload(models.Mes.semanas)).filter(models.Mes.id == mes_id).first()
     if not db_mes: raise HTTPException(status_code=404, detail="Mês não encontrado.")
-    if current_user.congregacao_id != db_mes.congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    verificar_acesso_congregacao(current_user, db_mes.congregacao)
 
     if db_mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível adicionar semanas a um mês fechado.")
@@ -1226,8 +1253,7 @@ def adicionar_semana_endpoint(mes_id: int, semana: schemas.SemanaCreate, db: Ses
 def adicionar_despesa_endpoint(mes_id: int, semana_numero: int, despesa: schemas.DespesaCreate, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
     db_semana = db.query(models.Semana).filter_by(mes_id=mes_id, numero=semana_numero).first()
     if not db_semana: raise HTTPException(status_code=404, detail="Semana não encontrada.")
-    if current_user.congregacao_id != db_semana.mes.congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    verificar_acesso_congregacao(current_user, db_semana.mes.congregacao)
 
     if db_semana.mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível adicionar despesas a um mês fechado.")
@@ -1245,7 +1271,14 @@ def adicionar_despesa_endpoint(mes_id: int, semana_numero: int, despesa: schemas
         except ValueError:
             pass
 
-    nova_despesa = models.Despesa(descricao=despesa.descricao, valor=despesa.valor, data_registro=despesa.data_registro, semana_id=db_semana.id)
+    nova_despesa = models.Despesa(
+        descricao=despesa.descricao,
+        valor=despesa.valor,
+        data_registro=despesa.data_registro,
+        recorrente=despesa.recorrente,
+        periodicidade=despesa.periodicidade,
+        semana_id=db_semana.id,
+    )
     db.add(nova_despesa)
     db.commit()
     db.refresh(nova_despesa)
@@ -1257,8 +1290,7 @@ def adicionar_despesa_endpoint(mes_id: int, semana_numero: int, despesa: schemas
 def remover_despesa(despesa_id: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
     db_despesa = db.query(models.Despesa).filter(models.Despesa.id == despesa_id).first()
     if not db_despesa: raise HTTPException(status_code=404, detail="Despesa não encontrada.")
-    if current_user.congregacao_id != db_despesa.semana.mes.congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    verificar_acesso_congregacao(current_user, db_despesa.semana.mes.congregacao)
 
     if db_despesa.semana.mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível remover despesas de um mês fechado.")
@@ -1278,9 +1310,7 @@ def get_analises_mes(mes_id: int, db: Session = Depends(get_db), current_user: m
     db_mes = db.query(models.Mes).filter(models.Mes.id == mes_id).first()
     if not db_mes: raise HTTPException(status_code=404, detail="Mês não encontrado.")
 
-    # Permissão: apenas admins ou o tesoureiro da congregação
-    if current_user.funcao == 'tesoureiro' and current_user.congregacao_id != db_mes.congregacao_id:
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    verificar_acesso_congregacao(current_user, db_mes.congregacao)
 
     # Buscar semanas com rendas e despesas
     semanas = db.query(models.Semana).options(
@@ -1363,8 +1393,7 @@ def get_analises_mes(mes_id: int, db: Session = Depends(get_db), current_user: m
 def obter_balancete_mensal(mes_id: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
     db_mes = db.query(models.Mes).filter(models.Mes.id == mes_id).first()
     if not db_mes: raise HTTPException(status_code=404, detail="Mês não encontrado.")
-    if current_user.congregacao_id != db_mes.congregacao_id and current_user.funcao == 'tesoureiro':
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    verificar_acesso_congregacao(current_user, db_mes.congregacao)
 
     semanas = db.query(models.Semana).options(joinedload(models.Semana.despesas), joinedload(models.Semana.rendas)).filter(models.Semana.mes_id == mes_id).all()
 
