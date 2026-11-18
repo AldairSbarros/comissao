@@ -13,4 +13,5 @@ httpx
 pytest-asyncio
 python-dateutil
 openpyxl==3.1.5
+pymupdf
 

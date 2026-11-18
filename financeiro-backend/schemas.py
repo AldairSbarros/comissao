@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from typing import List, Optional
-from datetime import date # Importar date para o campo data_registro
+from datetime import date, datetime # Importar date para o campo data_registro
 
 # --- Schemas de Despesa ---
 class DespesaBase(BaseModel):
@@ -44,7 +44,28 @@ class Renda(RendaBase):
     id: int
     congregacao_id: int
     semana_id: int
+    recibo_imagem: Optional[str] = None
+    mensagem_enviada_em: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+# --- Schemas de Recibos Pendentes (upload + conferencia) ---
+class ReciboPendente(BaseModel):
+    id: int
+    congregacao_id: int
+    semana_id: int
+    pagina_origem: Optional[int] = None
+    status: str
+    renda_id: Optional[int] = None
+    sugestao_ocr: Optional[str] = None  # JSON: {data, numero_recibo, nome, valor}
+    arquivo_par: Optional[str] = None
+    sugestao_par: Optional[str] = None
+    ocr_erro: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class ReciboPendenteConfirmar(RendaCreate):
+    # Idem RendaCreate, mas permite informar o nome para criar/vincular o
+    # dizimista quando o id nao e conhecido (fluxo da tela de conferencia).
+    dizimista_nome: Optional[str] = None
 
 # --- Schemas de Semana (Lógica Simples) ---
 class SemanaBase(BaseModel):
@@ -200,6 +221,11 @@ class DenominacaoStatusUpdate(BaseModel):
 
 class UsuarioBase(BaseModel):
     email: EmailStr
+    telefone: Optional[str] = None
+
+
+class UsuarioTelefoneUpdate(BaseModel):
+    telefone: Optional[str] = None
 
 class UsuarioCreate(UsuarioBase):
     password: str

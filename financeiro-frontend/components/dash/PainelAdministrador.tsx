@@ -10,7 +10,7 @@ import {
   criarArea, atualizarArea, removerArea, listarAreasPorDenominacao,
   criarCongregacao, atualizarCongregacao, removerCongregacao,
   listarCongregacoesPorDenominacao, getDenominacao,
-  listarUsuariosPorDenominacao, criarUsuarioNaDenominacao,
+  listarUsuariosPorDenominacao, criarUsuarioNaDenominacao, atualizarTelefoneUsuario,
 } from "@/lib/api";
 import { AreaEclesiastica, Congregacao, Usuario } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,7 @@ const FUNCAO_LABEL: Record<string, string> = {
   supervisor_denominacao: "Supervisor de Denominação",
   supervisor_area: "Supervisor de Área",
   tesoureiro: "Tesoureiro",
+  dirigente: "Dirigente",
 };
 
 // Extrai a mensagem de erro detalhada do backend (FastAPI) de um erro do axios.
@@ -61,7 +62,9 @@ export default function PainelAdministrador() {
   // Usuários
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [novoUsuario, setNovoUsuario] = useState({ email: "", password: "", funcao: "tesoureiro", congregacao_id: "" as number | "" });
+  const [novoUsuario, setNovoUsuario] = useState({ email: "", password: "", funcao: "tesoureiro", telefone: "", congregacao_id: "" as number | "" });
+  const [usuarioEditandoTelefone, setUsuarioEditandoTelefone] = useState<Usuario | null>(null);
+  const [telefoneEdicao, setTelefoneEdicao] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -72,8 +75,8 @@ export default function PainelAdministrador() {
   // Papéis que o usuário logado pode atribuir.
   const funcoesDisponiveis = (() => {
     if (!user) return [];
-    if (user.funcao === "administrador") return ["administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro"];
-    if (user.funcao === "supervisor_denominacao") return ["supervisor_area", "tesoureiro"];
+    if (user.funcao === "administrador") return ["administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro", "dirigente"];
+    if (user.funcao === "supervisor_denominacao") return ["supervisor_area", "tesoureiro", "dirigente"];
     if (user.funcao === "supervisor_area") return ["tesoureiro"];
     return [];
   })();
@@ -220,8 +223,29 @@ export default function PainelAdministrador() {
 
   // --- Usuários ---
   const abrirNovoUsuario = () => {
-    setNovoUsuario({ email: "", password: "", funcao: "tesoureiro", congregacao_id: "" });
+    setNovoUsuario({ email: "", password: "", funcao: "tesoureiro", telefone: "", congregacao_id: "" });
     setIsUserModalOpen(true);
+  };
+
+  const abrirEditarTelefone = (usuario: Usuario) => {
+    setUsuarioEditandoTelefone(usuario);
+    setTelefoneEdicao(usuario.telefone ?? "");
+  };
+
+  const handleSalvarTelefone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!denominacaoId || !usuarioEditandoTelefone || isSaving) return;
+    setIsSaving(true);
+    try {
+      await atualizarTelefoneUsuario(denominacaoId, usuarioEditandoTelefone.id, telefoneEdicao.trim() || null);
+      toast.success(`WhatsApp de "${usuarioEditandoTelefone.email}" atualizado.`);
+      setUsuarioEditandoTelefone(null);
+      await carregarDados();
+    } catch (error) {
+      toast.error(detalheErro(error) || "Erro ao atualizar telefone.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCriarUsuario = async (e: React.FormEvent) => {
@@ -229,14 +253,15 @@ export default function PainelAdministrador() {
     if (!denominacaoId || !novoUsuario.email.trim() || !novoUsuario.password || isSaving) return;
     setIsSaving(true);
     try {
-      const payload: { email: string; password: string; funcao: string; congregacao_id?: number; area_id?: number } = {
+      const payload: { email: string; password: string; funcao: string; telefone?: string; congregacao_id?: number; area_id?: number } = {
         email: novoUsuario.email.trim(),
         password: novoUsuario.password,
         funcao: novoUsuario.funcao,
+        telefone: novoUsuario.telefone.trim() || undefined,
       };
-      if (novoUsuario.funcao === "tesoureiro") {
+      if (novoUsuario.funcao === "tesoureiro" || novoUsuario.funcao === "dirigente") {
         if (novoUsuario.congregacao_id === "") {
-          toast.warning("Selecione a congregação do tesoureiro.");
+          toast.warning(`Selecione a congregação do ${novoUsuario.funcao}.`);
           return;
         }
         payload.congregacao_id = novoUsuario.congregacao_id;
@@ -403,6 +428,7 @@ export default function PainelAdministrador() {
                     <th className="py-2 pr-4 font-medium">E-mail</th>
                     <th className="py-2 pr-4 font-medium">Função</th>
                     <th className="py-2 pr-4 font-medium">Vínculo</th>
+                    <th className="py-2 pr-4 font-medium">WhatsApp</th>
                     <th className="py-2 pr-4 font-medium">Status</th>
                   </tr>
                 </thead>
@@ -417,6 +443,22 @@ export default function PainelAdministrador() {
                           : u.area_id
                             ? nomeDaArea(u.area_id)
                             : "Denominação"}
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <span>{u.telefone || "—"}</span>
+                          {podeGerenciarUsuarios && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              title="Editar WhatsApp"
+                              onClick={() => abrirEditarTelefone(u)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </span>
                       </td>
                       <td className="py-2 pr-4">
                         {u.is_active === false ? (
@@ -546,6 +588,15 @@ export default function PainelAdministrador() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="usuario_telefone">Telefone WhatsApp (opcional)</Label>
+              <Input
+                id="usuario_telefone"
+                value={novoUsuario.telefone}
+                onChange={(e) => setNovoUsuario(prev => ({ ...prev, telefone: e.target.value }))}
+                placeholder="Ex: (92) 99999-9999"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="usuario_funcao">Função *</Label>
               <select
                 id="usuario_funcao"
@@ -558,7 +609,7 @@ export default function PainelAdministrador() {
                 ))}
               </select>
             </div>
-            {novoUsuario.funcao === "tesoureiro" && (
+            {(novoUsuario.funcao === "tesoureiro" || novoUsuario.funcao === "dirigente") && (
               <div className="space-y-2">
                 <Label htmlFor="usuario_congregacao">Congregação *</Label>
                 <select
@@ -580,6 +631,33 @@ export default function PainelAdministrador() {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsUserModalOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={isSaving}>{isSaving ? "Criando..." : "Criar Usuário"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Editar WhatsApp do Usuário */}
+      <Dialog open={!!usuarioEditandoTelefone} onOpenChange={(open) => { if (!open) setUsuarioEditandoTelefone(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>WhatsApp do Usuário</DialogTitle>
+            <DialogDescription>
+              Informe o número usado para enviar fotos de recibos pelo WhatsApp ({usuarioEditandoTelefone?.email}).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSalvarTelefone} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editar_telefone">Telefone WhatsApp</Label>
+              <Input
+                id="editar_telefone"
+                value={telefoneEdicao}
+                onChange={(e) => setTelefoneEdicao(e.target.value)}
+                placeholder="Ex: (92) 99999-9999"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setUsuarioEditandoTelefone(null)}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

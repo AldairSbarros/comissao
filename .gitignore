@@ -73,4 +73,6 @@ node_modules/
 dist/
 build/
 venv/
-__pycache__/.worktrees/
+__pycache__/
+.worktrees/
+docs/config-yaml.txt

@@ -8,12 +8,16 @@ import {
   reabrirMes,
   getBalancetePdfUrl,
   getDizimistasPdfUrl,
+  getPlanilhaMesUrl,
+  getPlanilhaSemanaUrl,
   adicionarSemana,
   adicionarRenda,
   removerRenda,
   adicionarDespesa,
   removerDespesa,
-  listarDizimistas
+  listarDizimistas,
+  agradecerRenda,
+  agradecerSemana
 } from "@/lib/api";
 import { Mes, RendaCreateData, DespesaCreateData, DizimistaOfertante } from "@/lib/types";
 import CriarMesForm from "@/components/forms/CriarMesForm";
@@ -26,16 +30,18 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Lock, Unlock, FileDown, PlusCircle, Trash2 } from "lucide-react";
+import { Lock, Unlock, FileDown, FileSpreadsheet, PlusCircle, Trash2, MessageCircle, CheckCheck } from "lucide-react";
 import { RendaForm } from "@/components/forms/RendaForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 // Nova importação do componente de análise de mês (versão completa do dash)
 import AnaliseMes from "@/components/dash/AnaliseMes";
+import RecibosSemana from "@/components/dash/RecibosSemana";
 
-export default function GestaoMes() {
+export default function GestaoMes({ congregacaoId }: { congregacaoId?: number }) {
   const { user } = useAuth();
+  const alvoCongregacaoId = congregacaoId ?? user?.congregacao_id;
   const [meses, setMeses] = useState<Mes[]>([]);
   const [dizimistas, setDizimistas] = useState<DizimistaOfertante[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,14 +57,15 @@ export default function GestaoMes() {
   // Estado para controle da visualização da análise de um mês
   const [mesIdParaAnalise, setMesIdParaAnalise] = useState<number | null>(null);
 
-    useEffect(() => {
+  useEffect(() => {
     async function carregarDadosIniciais() {
-      if (user?.congregacao_id) {
+      if (alvoCongregacaoId) {
         setIsLoading(true);
+        setMesIdParaAnalise(null);
         try {
           const [mesesDaApi, dizimistasDaApi] = await Promise.all([
-            listarMeses(user.congregacao_id),
-            listarDizimistas(user.congregacao_id)
+            listarMeses(alvoCongregacaoId),
+            listarDizimistas(alvoCongregacaoId)
           ]);
           setMeses(mesesDaApi);
           setDizimistas(dizimistasDaApi);
@@ -70,14 +77,14 @@ export default function GestaoMes() {
       }
     }
     carregarDadosIniciais();
-  }, [user]);
+  }, [alvoCongregacaoId]);
 
   // Função para fechar a visualização de análise
   const fecharAnalise = () => setMesIdParaAnalise(null);
 
   const recarregarMeses = async () => {
-    if (user?.congregacao_id) {
-      const mesesDaApi = await listarMeses(user.congregacao_id);
+    if (alvoCongregacaoId) {
+      const mesesDaApi = await listarMeses(alvoCongregacaoId);
       setMeses(mesesDaApi);
     }
   };
@@ -107,6 +114,34 @@ export default function GestaoMes() {
       window.open(url, '_blank');
     } catch (err) {
       toast.error("Erro ao gerar PDF.");
+    }
+  };
+
+  const baixarXlsx = (url: string, nomeArquivo: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  const handleDownloadPlanilhaMes = async (mesId: number, nomeMes: string) => {
+    try {
+      const url = await getPlanilhaMesUrl(mesId);
+      baixarXlsx(url, `planilha_${nomeMes.replace('/', '-')}.xlsx`);
+    } catch (err) {
+      toast.error("Erro ao gerar planilha do mês.");
+    }
+  };
+
+  const handleDownloadPlanilhaSemana = async (semanaId: number, numero: number) => {
+    try {
+      const url = await getPlanilhaSemanaUrl(semanaId);
+      baixarXlsx(url, `planilha_semana_${numero}.xlsx`);
+    } catch (err) {
+      toast.error("Erro ao gerar planilha da semana.");
     }
   };
 
@@ -153,6 +188,39 @@ export default function GestaoMes() {
     }
   };
 
+  const detalheErro = (err: unknown, padrao: string): string => {
+    if (typeof err === "object" && err !== null && "response" in err) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      if (detail) return detail;
+    }
+    if (err instanceof Error) return err.message;
+    return padrao;
+  };
+
+  const handleAgradecerRenda = async (rendaId: number) => {
+    try {
+      const res = await agradecerRenda(rendaId);
+      toast.success(`Agradecimento enviado por WhatsApp${res.com_imagem ? " com a foto do recibo" : ""}!`);
+      await recarregarMeses();
+    } catch(err: unknown) {
+      toast.error(detalheErro(err, "Erro ao enviar agradecimento."));
+    }
+  };
+
+  const handleAgradecerSemana = async (semanaId: number) => {
+    if(!confirm("Enviar agradecimento por WhatsApp para todos da semana?")) return;
+    setIsProcessing(true);
+    try {
+      const res = await agradecerSemana(semanaId);
+      toast.success(`Enviadas: ${res.enviadas.length} • Já enviadas: ${res.ja_enviadas.length} • Sem telefone: ${res.sem_telefone.length} • Falhas: ${res.falhas.length}`);
+      await recarregarMeses();
+    } catch(err: unknown) {
+      toast.error(detalheErro(err, "Erro ao enviar agradecimentos."));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleSubmitDespesa = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!selectedSemanaForDespesa) return;
@@ -191,7 +259,7 @@ export default function GestaoMes() {
 
   return (
     <div className="space-y-6">
-      <CriarMesForm onMesCriado={handleMesCriado} />
+      <CriarMesForm onMesCriado={handleMesCriado} congregacaoId={alvoCongregacaoId} />
 
       <Card>
         <CardHeader>
@@ -239,6 +307,9 @@ export default function GestaoMes() {
                           }}>
                             <FileDown className="h-4 w-4 mr-2" /> Lista de Dizimistas (PDF)
                           </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadPlanilhaMes(mes.id, mes.nome)}>
+                            <FileSpreadsheet className="h-4 w-4 mr-2" /> Planilha do mês (XLSX)
+                          </Button>
                           {mes.fechado ? (
                             user?.funcao === 'administrador' && (
                               <Button variant="destructive" size="sm" onClick={() => handleStatusMes(mes.id, 'reabrir')} disabled={isProcessing}>
@@ -274,7 +345,8 @@ export default function GestaoMes() {
                                   <p className="font-bold border-t border-border mt-1 pt-1">Fim: R$ {semana.saldo_final_semana.toFixed(2)}</p>
                                 </div>
                               </CardHeader>
-                              <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <CardContent className="pt-4 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Coluna Rendas */}
                                 <div>
                                   <div className="flex justify-between items-center mb-2 border-b pb-1">
@@ -307,6 +379,17 @@ export default function GestaoMes() {
                                           </div>
                                           <div className="flex items-center gap-2">
                                             <span>R$ {r.valor.toFixed(2)}</span>
+                                            {r.mensagem_enviada_em ? (
+                                              <span title="Agradecimento enviado por WhatsApp">
+                                                <CheckCheck className="h-4 w-4 text-emerald-400" />
+                                              </span>
+                                            ) : (
+                                              !mes.fechado && user?.funcao !== 'dirigente' && (
+                                                <Button variant="ghost" size="icon" title="Agradecer por WhatsApp" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-emerald-400" onClick={() => handleAgradecerRenda(r.id)}>
+                                                  <MessageCircle className="h-3 w-3" />
+                                                </Button>
+                                              )
+                                            )}
                                             {!mes.fechado && (
                                               <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-red-500" onClick={() => handleRemoverRenda(r.id)}>
                                                 <Trash2 className="h-3 w-3" />
@@ -357,6 +440,28 @@ export default function GestaoMes() {
                                     )}
                                   </ul>
                                 </div>
+                                </div>
+
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="outline" size="sm" onClick={() => handleDownloadPlanilhaSemana(semana.id, semana.numero)}>
+                                    <FileSpreadsheet className="h-4 w-4 mr-2" /> Planilha da semana (XLSX)
+                                  </Button>
+                                  {!mes.fechado && user?.funcao !== 'dirigente' && (
+                                    <Button variant="outline" size="sm" onClick={() => handleAgradecerSemana(semana.id)} disabled={isProcessing}>
+                                      <MessageCircle className="h-4 w-4 mr-2" /> Agradecer todos (WhatsApp)
+                                    </Button>
+                                  )}
+                                </div>
+
+                                <RecibosSemana
+                                  semanaId={semana.id}
+                                  semanaNumero={semana.numero}
+                                  dataInicio={semana.data_inicio}
+                                  dataFim={semana.data_fim}
+                                  dizimistas={dizimistas}
+                                  mesFechado={mes.fechado || user?.funcao === 'dirigente'}
+                                  onLancado={recarregarMeses}
+                                />
 
                               </CardContent>
                             </Card>

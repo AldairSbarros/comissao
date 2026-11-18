@@ -152,6 +152,17 @@ A API possui mecanismos de defesa robustos:
 | **POST** | `/despesas/recorrentes/duplicar`| Duplica as despesas marcadas como recorrentes para o próximo período. |
 | **GET** | `/meses/{id}/balancete/` | Resumo financeiro total do mês em JSON. |
 | **GET** | `/meses/{id}/balancete/pdf` | Gera e baixa o relatório em PDF pronto para impressão. |
+| **GET** | `/meses/{id}/dizimistas/pdf` | Lista de dizimistas do mês em PDF (sem valores). |
+| **GET** | `/semanas/{id}/planilha` | Planilha XLSX da semana (data, recibo, nome, valor, total, 33%). |
+| **GET** | `/meses/{id}/planilha` | Planilha XLSX do mês (resumo + uma aba por semana). |
+| **POST** | `/semanas/{id}/recibos/upload` | Envia PDF/fotos de recibos; cada página vira um item de conferência. |
+| **GET** | `/semanas/{id}/recibos/` | Lista recibos (`?status_filtro=pendente\|confirmado`). |
+| **GET** | `/recibos/{id}/imagem` | Baixa a foto do recibo. |
+| **POST** | `/recibos/{id}/ocr/reprocessar` | Roda o OCR de novo num recibo pendente (requer `GEMINI_API_KEY`). |
+| **POST** | `/recibos/{id}/confirmar` | Confere e lança a contribuição (cria a Renda + recalcula). |
+| **DELETE** | `/recibos/{id}` | Descarta um recibo pendente. |
+| **POST** | `/rendas/{id}/agradecer` | Agradece por WhatsApp via Evolution API (com foto do recibo, se houver). |
+| **POST** | `/semanas/{id}/agradecer-todos` | Agradece a todos da semana (pula sem telefone e já enviados). |
 | **GET** | `/master/stats` | Estatísticas globais da plataforma (superuser). |
 | **GET** | `/master/tenants` | Lista todas as denominações/tenants (superuser). |
 | **POST** | `/master/tenants` | Cria uma denominação + seu administrador (superuser). |
@@ -164,3 +175,15 @@ A API possui mecanismos de defesa robustos:
 | **POST** | `/master/users/{id}/impersonate` | Personifica um usuário para suporte (superuser). |
 
 > **Dica para Desenvolvedores Frontend:** Em requisições de download do PDF (`/balancete/pdf`), configure o seu client HTTP (como Axios) para aceitar `responseType: 'blob'`.
+
+## 6. Variáveis de Ambiente (novas integrações)
+
+| Variável | Obrigatória para | Descrição |
+| :--- | :--- | :--- |
+| `MODEL_API_KEY` | OCR dos recibos (Muse, padrão) | Chave da Meta API. Sem ela, o upload funciona 100% manual. |
+| `OCR_MUSE_MODEL` | — (opcional) | Modelo de visão (default: `muse-spark-1.3`). |
+| `META_API_URL` | — (opcional) | Base da Meta API (default: `https://api.meta.ai/v1`). |
+| `OCR_PROVIDER=gemini` + `GEMINI_API_KEY` | OCR alternativo | Usa o Google AI Studio em vez do Muse. |
+| `EVOLUTION_API_URL` | WhatsApp | URL base da Evolution API (ex.: `https://evo.sua-igreja.com`). |
+| `EVOLUTION_API_KEY` | WhatsApp | Apikey global da Evolution. |
+| `EVOLUTION_INSTANCE` | WhatsApp | Nome da instância conectada. |

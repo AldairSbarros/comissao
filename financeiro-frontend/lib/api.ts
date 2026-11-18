@@ -5,7 +5,8 @@ import {
   DenominacaoCreateData, AreaEclesiastica, AreaEclesiasticaCreateData, AreaEclesiasticaUpdateData,
   Congregacao, CongregacaoCreateData, CongregacaoUpdateData, UsuarioCreateData, DizimistaOfertante,
   DizimistaOfertanteCreateData, DizimistaOfertanteUpdateData, Renda,
-  RendaCreateData, AnaliseMes, UserPasswordReset, UserStatusUpdate, TenantRename
+  RendaCreateData, AnaliseMes, UserPasswordReset, UserStatusUpdate, TenantRename,
+  ReciboPendente, ReciboConfirmarData
 } from "./types";
 import { MasterStats, SetupPayload, TenantCreate, DenominacaoStatusUpdate } from "./schemas";
 
@@ -134,6 +135,64 @@ export const getDizimistasPdfUrl = async (mesId: number): Promise<string> => {
     const blob = new Blob([response.data], { type: 'application/pdf' });
     return URL.createObjectURL(blob);
 }
+export const getPlanilhaSemanaUrl = async (semanaId: number): Promise<string> => {
+    const response = await api.get(`/semanas/${semanaId}/planilha`, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    return URL.createObjectURL(blob);
+}
+export const getPlanilhaMesUrl = async (mesId: number): Promise<string> => {
+    const response = await api.get(`/meses/${mesId}/planilha`, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    return URL.createObjectURL(blob);
+}
+// --- Recibos (upload + conferencia) ---
+export const uploadRecibos = async (semanaId: number, files: File[]): Promise<ReciboPendente[]> => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append("files", f));
+    const response = await api.post(`/semanas/${semanaId}/recibos/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+}
+export const listarRecibos = async (semanaId: number, statusFiltro?: 'pendente' | 'confirmado'): Promise<ReciboPendente[]> => {
+    const params = statusFiltro ? { params: { status_filtro: statusFiltro } } : {};
+    const response = await api.get(`/semanas/${semanaId}/recibos/`, params);
+    return response.data;
+}
+export const getReciboImagemUrl = async (reciboId: number): Promise<string> => {
+    const response = await api.get(`/recibos/${reciboId}/imagem`, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'image/png' });
+    return URL.createObjectURL(blob);
+}
+export const getReciboImagemParUrl = async (reciboId: number): Promise<string> => {
+    const response = await api.get(`/recibos/${reciboId}/imagem-par`, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'image/png' });
+    return URL.createObjectURL(blob);
+}
+export const confirmarRecibo = async (reciboId: number, data: ReciboConfirmarData): Promise<Renda> => {
+    const response = await api.post(`/recibos/${reciboId}/confirmar`, data);
+    return response.data;
+}
+export const confirmarRecibosConferidos = async (semanaId: number): Promise<{ confirmados: number[]; ignorados: number[] }> => {
+    const response = await api.post(`/semanas/${semanaId}/recibos/confirmar-conferidos`);
+    return response.data;
+}
+export const excluirRecibo = async (reciboId: number): Promise<void> => {
+    await api.delete(`/recibos/${reciboId}`);
+}
+export const reprocessarOcr = async (reciboId: number): Promise<ReciboPendente> => {
+    const response = await api.post(`/recibos/${reciboId}/ocr/reprocessar`);
+    return response.data;
+}
+// --- Evolution (WhatsApp) ---
+export const agradecerRenda = async (rendaId: number, mensagem?: string): Promise<{ renda_id: number; numero: string; com_imagem: boolean }> => {
+    const response = await api.post(`/rendas/${rendaId}/agradecer`, mensagem ? { mensagem } : {});
+    return response.data;
+}
+export const agradecerSemana = async (semanaId: number): Promise<{ enviadas: number[]; ja_enviadas: number[]; sem_telefone: number[]; falhas: { renda_id: number; erro: string }[] }> => {
+    const response = await api.post(`/semanas/${semanaId}/agradecer-todos`);
+    return response.data;
+}
 export const criarDenominacao = async (denominacaoData: DenominacaoCreateData): Promise<Denominacao> => {
     const response = await api.post("/denominacoes/", denominacaoData);
     return response.data;
@@ -186,6 +245,10 @@ export const listarUsuariosPorDenominacao = async (denominacaoId: number): Promi
 }
 export const criarUsuarioNaDenominacao = async (denominacaoId: number, userData: Omit<UsuarioCreateData, "denominacao_id">): Promise<Usuario> => {
     const response = await api.post(`/denominacoes/${denominacaoId}/usuarios/`, userData);
+    return response.data;
+}
+export const atualizarTelefoneUsuario = async (denominacaoId: number, userId: number, telefone: string | null): Promise<Usuario> => {
+    const response = await api.put(`/denominacoes/${denominacaoId}/usuarios/${userId}/telefone`, { telefone });
     return response.data;
 }
 export const baixarBackup = async (): Promise<string> => {

@@ -147,6 +147,7 @@ def create_user(db: Session, user: schemas.UsuarioCreate, *, commit: bool = True
         email=user.email,
         hashed_password=hashed_password,
         funcao=user.funcao,
+        telefone=user.telefone,
         is_superuser=user.is_superuser,
         denominacao_id=user.denominacao_id,
         area_id=user.area_id,

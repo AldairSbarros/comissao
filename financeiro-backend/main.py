@@ -17,6 +17,9 @@ from fastapi import UploadFile, File
 
 import crud, models, schemas, security
 import importador
+import planilha
+import recibos
+import evolution
 from database import get_db, engine
 from migrations import apply_migrations
 
@@ -97,6 +100,14 @@ def verificar_acesso_congregacao(current_user: models.Usuario, congregacao: mode
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Acesso negado. Você não tem permissão para acessar os dados financeiros desta congregação."
     )
+
+def bloquear_escrita_dirigente(current_user: models.Usuario):
+    """Dirigente é somente leitura: barra qualquer escrita financeira."""
+    if current_user.funcao == 'dirigente':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Dirigentes podem apenas visualizar dados financeiros."
+        )
 
 @app.post("/token", response_model=schemas.Token)
 def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
@@ -289,6 +300,9 @@ def delete_tenant_endpoint(tenant_id: int, db: Session = Depends(get_db)):
 # --- Registrar o Router do Painel Master ---
 app.include_router(master_router)
 app.include_router(importador.router)
+app.include_router(planilha.router)
+app.include_router(recibos.router)
+app.include_router(evolution.router)
 
 # --- Endpoints de Setup e Usuários ---
 @app.post("/usuarios/", response_model=schemas.Usuario)
@@ -299,7 +313,7 @@ def create_user_endpoint(
 ):
     if user.is_superuser or user.funcao.strip().lower() == "superuser":
         raise HTTPException(status_code=403, detail="Superusuario so pode ser criado pelo setup inicial ou seed.")
-    if user.funcao not in {"administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro"}:
+    if user.funcao not in {"administrador", "supervisor_denominacao", "supervisor_area", "tesoureiro", "dirigente"}:
         raise HTTPException(status_code=400, detail="Funcao de usuario invalida.")
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
@@ -618,10 +632,50 @@ def create_user_in_denominacao(
         db_area = crud.get_area_eclesiastica_by_id(db, user.area_id)
         if not db_area or db_area.denominacao_id != denominacao_id:
             raise HTTPException(status_code=400, detail="Área inválida para esta denominação.")
+    elif user.funcao == 'dirigente':
+        if not user.congregacao_id:
+            raise HTTPException(status_code=400, detail="Dirigentes devem ser vinculados a uma congregação.")
+        db_congregacao = crud.get_congregacao_by_id(db, user.congregacao_id)
+        if not db_congregacao or db_congregacao.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=400, detail="Congregação inválida para esta denominação.")
 
     if crud.get_user_by_email(db, email=user.email):
         raise HTTPException(status_code=400, detail="Email already registered")
     return crud.create_user(db=db, user=user)
+
+
+@app.put("/denominacoes/{denominacao_id}/usuarios/{user_id}/telefone", response_model=schemas.Usuario)
+def update_user_telefone_in_denominacao(
+    denominacao_id: int,
+    user_id: int,
+    payload: schemas.UsuarioTelefoneUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    if current_user.is_superuser or current_user.funcao == "administrador":
+        pass
+    elif current_user.funcao in ("supervisor_denominacao", "supervisor_area"):
+        if current_user.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=403, detail="Acesso negado. Você não pertence a esta denominação.")
+    else:
+        raise HTTPException(status_code=403, detail="Acesso negado. Apenas administradores ou supervisores podem atualizar telefones.")
+
+    db_user = crud.get_user_by_id(db, user_id=user_id)
+    if not db_user or db_user.denominacao_id != denominacao_id:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado nesta denominação.")
+
+    if current_user.funcao == "supervisor_area":
+        if db_user.congregacao_id:
+            cong = crud.get_congregacao_by_id(db, db_user.congregacao_id)
+            if not cong or cong.area_id != current_user.area_id:
+                raise HTTPException(status_code=403, detail="Acesso negado. Usuário fora da sua área.")
+        elif db_user.area_id != current_user.area_id:
+            raise HTTPException(status_code=403, detail="Acesso negado. Usuário fora da sua área.")
+
+    db_user.telefone = (payload.telefone or "").strip() or None
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 
 @app.get("/users/me/", response_model=schemas.Usuario)
 def read_users_me(current_user: models.Usuario = Depends(get_current_user)):
@@ -816,6 +870,7 @@ def create_renda_endpoint(
         raise HTTPException(status_code=404, detail="Semana não encontrada.")
 
     verificar_acesso_congregacao(current_user, db_semana.mes.congregacao)
+    bloquear_escrita_dirigente(current_user)
 
     if db_semana.mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível adicionar rendas a um mês fechado.")
@@ -1266,6 +1321,7 @@ def criar_mes_endpoint(mes: schemas.MesCreate, db: Session = Depends(get_db), cu
     if not db_congregacao:
         raise HTTPException(status_code=404, detail="Congregação não encontrada.")
     verificar_acesso_congregacao(current_user, db_congregacao)
+    bloquear_escrita_dirigente(current_user)
     return crud.create_mes(db=db, mes=mes)
 
 @app.put("/meses/{mes_id}/fechar", response_model=schemas.Mes)
@@ -1274,6 +1330,7 @@ def fechar_mes_endpoint(mes_id: int, db: Session = Depends(get_db), current_user
     if not db_mes:
         raise HTTPException(status_code=404, detail="Mês não encontrado.")
     verificar_acesso_congregacao(current_user, db_mes.congregacao)
+    bloquear_escrita_dirigente(current_user)
 
     db_mes.fechado = True
     db.commit()
@@ -1309,6 +1366,7 @@ def adicionar_semana_endpoint(mes_id: int, semana: schemas.SemanaCreate, db: Ses
     db_mes = db.query(models.Mes).options(joinedload(models.Mes.semanas)).filter(models.Mes.id == mes_id).first()
     if not db_mes: raise HTTPException(status_code=404, detail="Mês não encontrado.")
     verificar_acesso_congregacao(current_user, db_mes.congregacao)
+    bloquear_escrita_dirigente(current_user)
 
     if db_mes.fechado:
         raise HTTPException(status_code=400, detail="Não é possível adicionar semanas a um mês fechado.")

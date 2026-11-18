@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Wallet, ShieldCheck, LogOut } from "lucide-react";
+import { Wallet, ShieldCheck, LogOut, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import PainelFinanceiro from "@/components/dash/PainelFinanceiro";
@@ -14,6 +14,7 @@ const FUNCOES_ADMINISTRATIVAS = ["administrador", "supervisor_denominacao", "sup
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout, isImpersonating, restoreSuperuser } = useAuth();
+  const [modoAdmin, setModoAdmin] = useState<"financeiro" | "cadastros">("financeiro");
 
   useEffect(() => {
     if (authLoading) return;
@@ -40,7 +41,12 @@ export default function DashboardPage() {
   }
 
   const ehTesoureiro = user.funcao === "tesoureiro" || user.funcao === "dirigente" || (user.congregacao_id != null && !FUNCOES_ADMINISTRATIVAS.includes(user.funcao));
-  const titulo = ehTesoureiro ? "Painel do Tesoureiro" : "Painel Administrativo";
+  const podeAlternarModos = !ehTesoureiro && FUNCOES_ADMINISTRATIVAS.includes(user.funcao);
+  const titulo = ehTesoureiro
+    ? "Painel do Tesoureiro"
+    : modoAdmin === "financeiro"
+      ? "Financeiro das Congregações"
+      : "Painel Administrativo";
 
   return (
     <div className="flex min-h-screen flex-col bg-[#0B0F19] text-white p-6 md:p-10 font-sans">
@@ -68,15 +74,43 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-3xl font-bold tracking-tight">{titulo}</h1>
-        <Button onClick={logout} variant="outline" className="border-slate-700 hover:bg-slate-800 hover:text-white">
-          <LogOut className="h-4 w-4 mr-2" />
-          Sair
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {podeAlternarModos && (
+            <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900/70 p-1">
+              <Button
+                size="sm"
+                variant={modoAdmin === "financeiro" ? "default" : "ghost"}
+                onClick={() => setModoAdmin("financeiro")}
+              >
+                <Wallet className="h-4 w-4 mr-1.5" />
+                Financeiro das Congregações
+              </Button>
+              <Button
+                size="sm"
+                variant={modoAdmin === "cadastros" ? "default" : "ghost"}
+                onClick={() => setModoAdmin("cadastros")}
+              >
+                <Building2 className="h-4 w-4 mr-1.5" />
+                Cadastros e Equipe
+              </Button>
+            </div>
+          )}
+          <Button onClick={logout} variant="outline" className="border-slate-700 hover:bg-slate-800 hover:text-white">
+            <LogOut className="h-4 w-4 mr-2" />
+            Sair
+          </Button>
+        </div>
       </div>
 
-      {ehTesoureiro ? <PainelFinanceiro /> : <PainelAdministrador />}
+      {ehTesoureiro ? (
+        <PainelFinanceiro />
+      ) : modoAdmin === "financeiro" ? (
+        <PainelFinanceiro />
+      ) : (
+        <PainelAdministrador />
+      )}
     </div>
   );
 }

@@ -26,7 +26,6 @@ import re
 import unicodedata
 from datetime import date, datetime
 
-import openpyxl
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -193,6 +192,10 @@ async def importar_planilha_endpoint(
         )
     numero_congregacao = int(db_congregacao.numero_co)
 
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=501, detail="Importação indisponível: biblioteca openpyxl não instalada no servidor.")
     conteudo = await file.read()
     try:
         wb_valores = openpyxl.load_workbook(io.BytesIO(conteudo), data_only=True)

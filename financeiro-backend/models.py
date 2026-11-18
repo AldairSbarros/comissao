@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Date, Boolean, Index # Importado Date e Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Date, DateTime, Boolean, Index # Importado Date e Boolean
 from sqlalchemy.orm import relationship, sessionmaker
 from database import Base
 
@@ -46,6 +46,30 @@ class DizimistaOfertante(Base): # Novo Modelo
     congregacao = relationship("Congregacao", back_populates="dizimistas")
     rendas = relationship("Renda", back_populates="dizimista_ofertante", cascade="all, delete-orphan") # Novo relacionamento
 
+class ReciboPendente(Base):
+    """Foto/pagina de recibo enviada para conferencia antes de virar Renda.
+
+    Os recibos sao manuscritos, entao nao ha lancamento automatico: cada linha
+    aqui e uma imagem aguardando digitacao+confirmacao do tesoureiro. O OCR
+    (quando configurado) preenche `sugestao_ocr` apenas como ponto de partida.
+    """
+    __tablename__ = 'recibos_pendentes'
+    id = Column(Integer, primary_key=True, index=True)
+    congregacao_id = Column(Integer, ForeignKey('congregacoes.id'), nullable=False)
+    semana_id = Column(Integer, ForeignKey('semanas.id'), nullable=False)
+    arquivo = Column(String, nullable=False)  # caminho relativo dentro de data/recibos/
+    pagina_origem = Column(Integer, nullable=True)  # pagina do PDF de origem (1-based)
+    status = Column(String, nullable=False, default='pendente')  # pendente|confirmado
+    renda_id = Column(Integer, ForeignKey('rendas.id'), nullable=True)
+    sugestao_ocr = Column(String, nullable=True)  # JSON: {data, numero_recibo, nome, valor}
+    arquivo_par = Column(String, nullable=True)  # imagem da 2a via pareada pelo numero_recibo
+    sugestao_par = Column(String, nullable=True)  # JSON da leitura OCR da outra via pareada
+    ocr_erro = Column(String, nullable=True)
+    data_upload = Column(Date, default=datetime.date.today, nullable=False)
+    congregacao = relationship("Congregacao")
+    semana = relationship("Semana")
+    renda = relationship("Renda")
+
 class Renda(Base): # Novo Modelo
     __tablename__ = 'rendas'
     id = Column(Integer, primary_key=True, index=True)
@@ -54,6 +78,8 @@ class Renda(Base): # Novo Modelo
     data_registro = Column(Date, nullable=False) # Data em que a renda foi lançada/ocorrida
     numero_recibo = Column(String, nullable=True)
     observacao = Column(String, nullable=True)
+    recibo_imagem = Column(String, nullable=True) # caminho relativo da foto do recibo em data/recibos/
+    mensagem_enviada_em = Column(DateTime, nullable=True) # quando o agradecimento WhatsApp foi enviado
     metodo_pagamento = Column(String, nullable=False) # Ex: "Pix", "Espécie", "Transferência", "Cartão"
     congregacao_id = Column(Integer, ForeignKey('congregacoes.id'), nullable=False)
     semana_id = Column(Integer, ForeignKey('semanas.id'), nullable=False)
@@ -68,6 +94,7 @@ class Usuario(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     funcao = Column(String, nullable=False)
+    telefone = Column(String, nullable=True)
     is_superuser = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     denominacao_id = Column(Integer, ForeignKey('denominacoes.id'), nullable=True)

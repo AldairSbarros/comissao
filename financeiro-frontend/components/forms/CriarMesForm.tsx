@@ -11,16 +11,18 @@ import { Mes } from "@/lib/types";
 
 interface CriarMesFormProps {
   onMesCriado: (novoMes: Mes) => void;
+  congregacaoId?: number;
 }
 
-export default function CriarMesForm({ onMesCriado }: CriarMesFormProps) {
+export default function CriarMesForm({ onMesCriado, congregacaoId }: CriarMesFormProps) {
   const [nomeMes, setNomeMes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+  const alvoCongregacaoId = congregacaoId ?? user?.congregacao_id;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomeMes.trim() || !user?.congregacao_id) {
+    if (!nomeMes.trim() || !alvoCongregacaoId) {
       toast.error("O nome do mês é obrigatório.");
       return;
     }
@@ -29,7 +31,7 @@ export default function CriarMesForm({ onMesCriado }: CriarMesFormProps) {
       // A função `criarMes` ainda não existe em `lib/api.ts`, vou criá-la a seguir.
       const novoMes = await criarMes({
         nome: nomeMes,
-        congregacao_id: user.congregacao_id,
+        congregacao_id: alvoCongregacaoId,
       });
       toast.success(`Mês "${novoMes.nome}" criado com sucesso!`);
       onMesCriado(novoMes); // Notifica o componente pai que um novo mês foi criado

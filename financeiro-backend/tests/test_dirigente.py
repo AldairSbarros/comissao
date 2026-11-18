@@ -222,3 +222,75 @@ def test_dirigente_nao_pode_deletar_renda(client: TestClient, db_session, setup_
 
     r = client.delete(f"/rendas/{renda.id}", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 403
+
+
+def _criar_dirigente_com_token(db_session, setup_data: dict, email: str):
+    """Cria um dirigente na congregacao 1 e devolve (token, congregacao)."""
+    from datetime import timedelta
+    denominacao = setup_data["denominacoes"]["denominacao1"]
+    area = setup_data["areas"]["area1_denominacao1"]
+    congregacao = setup_data["congregacoes"]["congregacao1_area1"]
+    dirigente = crud.create_user(db_session, schemas.UsuarioCreate(
+        email=email,
+        password="senha123",
+        funcao="dirigente",
+        denominacao_id=denominacao.id,
+        area_id=area.id,
+        congregacao_id=congregacao.id,
+    ))
+    token = security.create_access_token(
+        data={"sub": dirigente.email},
+        expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    return token, congregacao
+
+
+def test_dirigente_nao_pode_criar_renda_mes_semana_nem_fechar(client: TestClient, db_session, setup_data: dict):
+    """Dirigente e somente leitura: 403 em todas as escritas financeiras."""
+    token, congregacao = _criar_dirigente_com_token(db_session, setup_data, "dir5@teste.com")
+
+    r = client.post("/meses/", json={"nome": "X", "congregacao_id": congregacao.id},
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+    # Massa criada pelo tesoureiro para os demais endpoints.
+    token_tes = setup_data["tokens"]["congregacao1_area1"]
+    mes = client.post("/meses/", json={"nome": "2026/05", "congregacao_id": congregacao.id},
+                      headers={"Authorization": f"Bearer {token_tes}"}).json()
+    semana = client.post(f"/meses/{mes['id']}/semanas/",
+                         json={"numero": 1, "data_inicio": "2026-05-03", "data_fim": "2026-05-09"},
+                         headers={"Authorization": f"Bearer {token_tes}"}).json()
+
+    r = client.post(f"/meses/{mes['id']}/semanas/",
+                    json={"numero": 2, "data_inicio": "2026-05-10", "data_fim": "2026-05-16"},
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+    r = client.post(f"/semanas/{semana['id']}/rendas/",
+                    json={"tipo": "Dízimo", "valor": 10.0, "data_registro": "2026-05-04",
+                          "metodo_pagamento": "Espécie"},
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+    r = client.put(f"/meses/{mes['id']}/fechar", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+
+def test_criar_dirigente_via_api_exige_congregacao(client: TestClient, setup_data: dict):
+    """Admin cria dirigente vinculado a congregacao; sem ela, 400."""
+    token_admin = setup_data["tokens"]["admin"]
+    denominacao_id = setup_data["denominacoes"]["denominacao1"].id
+    congregacao_id = setup_data["congregacoes"]["congregacao1_area1"].id
+
+    r = client.post(f"/denominacoes/{denominacao_id}/usuarios/",
+                    json={"email": "dir6@teste.com", "password": "x", "funcao": "dirigente",
+                          "denominacao_id": denominacao_id, "congregacao_id": congregacao_id},
+                    headers={"Authorization": f"Bearer {token_admin}"})
+    assert r.status_code == 201
+    assert r.json()["funcao"] == "dirigente"
+
+    r = client.post(f"/denominacoes/{denominacao_id}/usuarios/",
+                    json={"email": "dir7@teste.com", "password": "x", "funcao": "dirigente",
+                          "denominacao_id": denominacao_id},
+                    headers={"Authorization": f"Bearer {token_admin}"})
+    assert r.status_code == 400
