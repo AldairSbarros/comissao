@@ -85,7 +85,7 @@ Antes de qualquer coisa, o sistema precisa do superusuário da plataforma.
 Com o administrador do tenant logado, a estrutura física da igreja é criada.
 1.  **Criar Área:** `POST /areas_eclesiasticas/` (vinculada à denominação)
 2.  **Criar Congregação:** `POST /congregacoes/` (vinculada à denominação e opcionalmente à área)
-3.  **Criar Usuários:** `POST /usuarios/` (Crie um usuário com função `tesoureiro` e vincule-o ao ID da Congregação criada).
+3.  **Gerenciar Equipe da Denominação:** use `/denominacoes/{id}/usuarios/` para listar, criar (`nome`, `email`, `password`, `funcao`, `telefone`, `congregacao_id` ou `area_id`), editar (`PUT /denominacoes/{id}/usuarios/{user_id}`), atualizar WhatsApp (`PUT /denominacoes/{id}/usuarios/{user_id}/telefone`) ou excluir usuários (`DELETE /denominacoes/{id}/usuarios/{user_id}`). O endpoint `POST /usuarios/` também existe para criação direta via superuser.
 
 ### Etapa 4: Cadastro de Membros
 Os tesoureiros devem cadastrar os membros que contribuem.
@@ -115,6 +115,21 @@ Ao final do mês, o tesoureiro gera o balancete e congela os dados.
 
 *(Apenas Administradores podem usar `PUT /meses/{mes_id}/reabrir` caso o tesoureiro tenha errado).*
 
+### Etapa 7: Conferência Inteligente de Recibos (1ª Via × 2ª Via) e WhatsApp
+O sistema apoia a auditoria cruzada entre a **1ª via branca** (enviada pelo tesoureiro na congregação) e a **2ª via azul** (escaneada pelo pastor em casa):
+
+1.  **Envio da 1ª Via (WhatsApp ou Câmera):**
+    *   **Via WhatsApp (`POST /webhooks/evolution`):** Quando a Evolution API envia eventos de mensagem recebida, o backend aplica 3 filtros em cascata: (1) valida se o remetente (`Usuario.telefone`) pertence a um usuário autorizado com permissão de escrita na congregação; (2) aceita apenas mídia de imagem em base64; (3) valida via OCR se a imagem é de fato um recibo. Qualquer outra mensagem (outros números, grupos, textos ou fotos aleatórias) é ignorada e encaminhada via `POST` para `EVOLUTION_FORWARD_WEBHOOK_URL` (quando configurada), permitindo compartilhar o mesmo número de WhatsApp com outro sistema (ex.: AletheIA).
+    *   **Via Câmera/Upload (`POST /semanas/{semana_id}/recibos/upload`):** Aceita fotos da câmera do celular ou PDFs/imagens escaneados (ex.: folha A4 com até 4 recibos da Epson L3110).
+2.  **Processamento OCR Multi-Recibos (`ocr.py` e `recibos.py`):**
+    *   Localiza automaticamente 1 ou múltiplos recibos na imagem, realiza recorte (`box_2d`) e rotação (`rotacao_graus`: 0, 90, 180 ou 270) com PyMuPDF.
+    *   Extrai `data`, `numero_recibo`, `nome`, `valor`, `valor_extenso` (tarja cinza *"Importância Supra de"* para desempate), `divergencia_valor`, `tipo` (`Dízimo` ou `Oferta`), `via` (`1a_via_branca` ou `2a_via_azul`) e `congregacao_numero` (convertendo algarismos romanos como `IX`, `XIII`, `XVII`, `XXIII`).
+    *   Cruza o nome lido com a lista `nomes_conhecidos` dos dizimistas da congregação e faz correspondência aproximada (`_buscar_dizimista_aproximado`) para sugerir o vínculo automático.
+3.  **Pareamento 1ª × 2ª Via e Confirmação:**
+    *   Ao identificar o mesmo `numero_recibo` pendente na semana, os recibos são pareados automaticamente (`arquivo_par`, `sugestao_par`), definindo `status_conferencia` como `"conferido_ok"` (valores idênticos) ou `"divergente"` (diferença entre as vias).
+    *   `GET /recibos/{id}/imagem-par` permite exibir a foto da via pareada lado a lado na conferência.
+    *   `POST /semanas/{id}/recibos/confirmar-conferidos` lança em lote todos os recibos com `status_conferencia == "conferido_ok"` válidos para a semana.
+
 ---
 
 ## 4. Tratamento de Erros e Exclusões (Soft-Block)
@@ -139,6 +154,11 @@ A API possui mecanismos de defesa robustos:
 | **GET** | `/users/me/` | Retorna os dados do usuário atualmente logado. |
 | **PUT** | `/users/me/password` | Muda a própria senha (requer a senha atual). |
 | **POST** | `/usuarios/` | Cria um usuário (exige superuser). |
+| **GET** | `/denominacoes/{id}/usuarios/` | Lista os usuários da denominação (admin da denominação ou superuser). |
+| **POST** | `/denominacoes/{id}/usuarios/` | Cria um usuário na denominação (com `nome`, `email`, `password`, `funcao`, `telefone`, vínculo). |
+| **PUT** | `/denominacoes/{id}/usuarios/{user_id}` | Edita nome, e-mail, senha opcional, WhatsApp, função e vínculo de um usuário da denominação. |
+| **PUT** | `/denominacoes/{id}/usuarios/{user_id}/telefone` | Atualiza rapidamente o WhatsApp de um usuário da denominação. |
+| **DELETE** | `/denominacoes/{id}/usuarios/{user_id}` | Exclui um usuário da denominação. |
 | **CRUD** | `/denominacoes/` | Gerenciamento da hierarquia principal. |
 | **CRUD** | `/areas_eclesiasticas/` | Gerenciamento de Áreas/Zonas. |
 | **CRUD** | `/congregacoes/` | Gerenciamento de Igrejas/Congregações. |
@@ -155,14 +175,17 @@ A API possui mecanismos de defesa robustos:
 | **GET** | `/meses/{id}/dizimistas/pdf` | Lista de dizimistas do mês em PDF (sem valores). |
 | **GET** | `/semanas/{id}/planilha` | Planilha XLSX da semana (data, recibo, nome, valor, total, 33%). |
 | **GET** | `/meses/{id}/planilha` | Planilha XLSX do mês (resumo + uma aba por semana). |
-| **POST** | `/semanas/{id}/recibos/upload` | Envia PDF/fotos de recibos; cada página vira um item de conferência. |
+| **POST** | `/semanas/{id}/recibos/upload` | Envia PDF/fotos de recibos; cada página ou recibo recortado vira um item de conferência. |
 | **GET** | `/semanas/{id}/recibos/` | Lista recibos (`?status_filtro=pendente\|confirmado`). |
-| **GET** | `/recibos/{id}/imagem` | Baixa a foto do recibo. |
-| **POST** | `/recibos/{id}/ocr/reprocessar` | Roda o OCR de novo num recibo pendente (requer `GEMINI_API_KEY`). |
+| **GET** | `/recibos/{id}/imagem` | Baixa a foto principal do recibo. |
+| **GET** | `/recibos/{id}/imagem-par` | Baixa a foto da via pareada (1ª via branca ou 2ª via azul) pelo `numero_recibo`. |
+| **POST** | `/recibos/{id}/ocr/reprocessar` | Roda o OCR de novo num recibo pendente (requer chave de OCR configurada). |
 | **POST** | `/recibos/{id}/confirmar` | Confere e lança a contribuição (cria a Renda + recalcula). |
+| **POST** | `/semanas/{id}/recibos/confirmar-conferidos` | Confirma e lança em lote todos os recibos da semana onde 1ª e 2ª vias conferem (`conferido_ok`). |
 | **DELETE** | `/recibos/{id}` | Descarta um recibo pendente. |
 | **POST** | `/rendas/{id}/agradecer` | Agradece por WhatsApp via Evolution API (com foto do recibo, se houver). |
 | **POST** | `/semanas/{id}/agradecer-todos` | Agradece a todos da semana (pula sem telefone e já enviados). |
+| **POST** | `/webhooks/evolution` | Webhook da Evolution API: recebe fotos da 1ª via enviadas pelo WhatsApp dos tesoureiros (filtro triplo) e repassa demais mensagens via `EVOLUTION_FORWARD_WEBHOOK_URL`. |
 | **GET** | `/master/stats` | Estatísticas globais da plataforma (superuser). |
 | **GET** | `/master/tenants` | Lista todas as denominações/tenants (superuser). |
 | **POST** | `/master/tenants` | Cria uma denominação + seu administrador (superuser). |
@@ -184,6 +207,8 @@ A API possui mecanismos de defesa robustos:
 | `OCR_MUSE_MODEL` | — (opcional) | Modelo de visão (default: `muse-spark-1.3`). |
 | `META_API_URL` | — (opcional) | Base da Meta API (default: `https://api.meta.ai/v1`). |
 | `OCR_PROVIDER=gemini` + `GEMINI_API_KEY` | OCR alternativo | Usa o Google AI Studio em vez do Muse. |
+| `OCR_GEMINI_MODEL` | — (opcional) | Modelo Gemini para OCR (default no código: `gemini-2.0-flash`; recomendado: `gemini-2.5-flash`). |
 | `EVOLUTION_API_URL` | WhatsApp | URL base da Evolution API (ex.: `https://evo.sua-igreja.com`). |
 | `EVOLUTION_API_KEY` | WhatsApp | Apikey global da Evolution. |
 | `EVOLUTION_INSTANCE` | WhatsApp | Nome da instância conectada. |
+| `EVOLUTION_FORWARD_WEBHOOK_URL` | — (opcional) | URL para encaminhar eventos do WhatsApp que não são fotos de recibo de tesoureiros (ex.: bot teológico AletheIA em `https://api.aletheia.ia.br/api/whatsapp/handle`). |

@@ -14,6 +14,7 @@ Este é o backend do sistema de controle financeiro eclesiástico, construído c
 *   **Gestão de Hierarquia Eclesiástica (CRUD):**
     *   Gestão de Denominações, Áreas Eclesiásticas e Congregações.
     *   Proteção contra exclusão acidental (soft-block) que impede deletar instâncias se existirem dados dependentes.
+*   **Gestão Completa de Equipe da Denominação:** Cadastro, listagem, edição completa (`nome`, `email`, `password`, `telefone` WhatsApp, `funcao` e vínculo de congregação/área) e exclusão de usuários pelo Administrador da Denominação (`/denominacoes/{id}/usuarios/`).
 *   **Gestão de Membros/Dizimistas:** Cadastro e histórico de dizimistas e ofertantes.
 *   **Controle Financeiro Rigoroso:**
     *   Gestão de finanças organizadas por Meses e Semanas.
@@ -21,14 +22,21 @@ Este é o backend do sistema de controle financeiro eclesiástico, construído c
     *   Lançamento de Despesas por semana, com suporte a data exata.
     *   **Fechamento de Mês:** Trava de segurança que impede edições e exclusões de dados financeiros após o fechamento do mês (reabertura permitida apenas para administradores).
     *   Recálculo automático e inteligente de saldos a cada nova inserção ou exclusão.
-*   **Relatórios:** Geração de balancetes financeiros mensais em formato PDF detalhado, com dados da denominação no cabeçalho e detalhamento item a item das rendas e despesas semanais.
+*   **OCR Inteligente Multi-Recibos e Cruzamento 1ª × 2ª Via:** Leitura automática via Gemini Vision / Meta Muse de fotos avulsas ou folhas escaneadas com até 4 recibos IEADAM (com recorte e rotação automáticos via PyMuPDF, leitura de valor por extenso e alerta de divergência, classificação de Dízimo/Oferta, conversão de algarismos romanos de congregação, vínculo automático com dizimistas cadastrados e pareamento automático entre 1ª via branca e 2ª via azul pelo número do recibo, com confirmação em lote).
+*   **Integração WhatsApp (Evolution API):** Recebimento automático de fotos da 1ª via enviadas pelo WhatsApp dos tesoureiros cadastrados (`POST /webhooks/evolution`) com filtro triplo e encaminhamento transparente de mensagens ignoradas (`EVOLUTION_FORWARD_WEBHOOK_URL`), além de envio de mensagem de agradecimento com a foto do recibo ao contribuinte.
+*   **Relatórios e Planilhas:** Geração de balancetes financeiros mensais em PDF, lista de dizimistas do mês em PDF (sem valores, para mural/dirigente) e exportação de planilhas Excel (`.xlsx`) semanais e mensais com cálculo automático da comissão de 33%.
 
 ## Estrutura do Projeto
 
-*   `main.py`: O ponto de entrada da aplicação FastAPI, define os endpoints e a lógica de roteamento.
+*   `main.py`: O ponto de entrada da aplicação FastAPI, define os endpoints principais e a lógica de roteamento.
 *   `models.py`: Define os modelos de dados (SQLAlchemy) para o banco de dados.
 *   `schemas.py`: Define os esquemas de validação e serialização de dados (Pydantic) para a API.
 *   `crud.py`: Contém as operações de Create, Read, Update, Delete (CRUD) para interagir com o banco de dados.
+*   `ocr.py`: Integração com modelos de visão (Meta Muse / Google Gemini) para leitura de recibos manuscritos avulsos ou múltiplos na mesma página.
+*   `recibos.py`: Endpoints e fluxo de upload de recibos (PDF/imagem), recorte/rotação via PyMuPDF, pareamento 1ª × 2ª via, conferência manual/em lote e confirmação.
+*   `evolution.py`: Integração com Evolution API para envio de agradecimentos por WhatsApp e webhook de recebimento de recibos (`POST /webhooks/evolution`).
+*   `planilha.py`: Geração de planilhas Excel (`.xlsx`) semanais e mensais com soma e cálculo de 33%.
+*   `importador.py`: Ferramentas de importação de planilhas e dados financeiros existentes.
 *   `database.py`: Configuração da conexão com o banco de dados.
 *   `security.py`: Funções para hashing de senhas e manipulação de tokens JWT.
 *   `seed.py`: (Opcional) Script para popular o banco de dados com o superusuário inicial. Aceita `--recover` para recuperar uma conta superuser afetada por um erro antigo.

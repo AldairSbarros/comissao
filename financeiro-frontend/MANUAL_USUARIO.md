@@ -108,33 +108,42 @@ Para fins de suporte e depuração, o superusuário pode "entrar" em uma conta d
 
 ---
 
-## 3. Configuração da Denominação (Administrador)
+## 3. Configuração da Denominação e Supervisão (Pastor / Administrador)
 
-Depois que o superusuário criou a denominação, o **administrador dela** faz login e configura a estrutura antes de os lançamentos começarem.
+Depois que o superusuário criou a denominação, o **administrador / pastor dela** faz login e passa a ter acesso completo com alternância rápida no topo da tela entre dois modos:
 
-1. **Criar Áreas Eclesiásticas:** agrupe congregações em áreas/zonas.
-2. **Criar Congregações:** cadastre cada igreja/congregação, vinculando-a à denominação (e, se houver, à área).
-3. **Criar Usuários:** cadastre os usuários com a função adequada e vincule-os à estrutura:
+- **"Financeiro das Congregações"**: exibe uma barra seletora com todas as congregações da área/denominação (ex.: Congregação 9, 13, 17, 23). Basta clicar na congregação desejada para abrir meses, semanas, recibos, despesas, dizimistas e gerar relatórios diretamente daquela igreja sem precisar trocar de conta.
+- **"Cadastros e Equipe"**: painel administrativo para gerenciar **Áreas Eclesiásticas**, **Congregações** (com `Nº CO` e área) e a tabela **Usuários**.
+
+### 3.1. Cadastro e Edição da Equipe (Tesoureiros e Supervisores)
+
+Na seção **Usuários** em **"Cadastros e Equipe"**:
+
+1. **Criar Usuário (`+ Novo Usuário`):** informe **Nome**, **E-mail**, **Senha**, **Telefone WhatsApp** (opcional — necessário para o tesoureiro enviar fotos de recibos pelo WhatsApp), **Função** e o vínculo correspondente:
    - **`administrador`**: acesso total à denominação.
    - **`supervisor_denominacao`**: acesso a todas as áreas e congregações da denominação.
    - **`supervisor_area`**: acesso às congregações da sua área.
-   - **`tesoureiro`**: acesso **apenas** à sua congregação. Vincule o tesoureiro ao **ID da congregação** correspondente.
+   - **`dirigente`**: visualização somente leitura dos dados financeiros da congregação vinculada.
+   - **`tesoureiro`**: acesso completo aos lançamentos financeiros da sua congregação vinculada.
+2. **Editar Usuário (ícone de lápis em Ações):** abre a janela **"Editar Usuário"** para alterar Nome, E-mail, Nova Senha (deixe em branco para manter a atual), WhatsApp, Função e Congregação/Área.
+3. **Editar WhatsApp rápido (lápis na coluna WhatsApp):** altera apenas o número de WhatsApp usado pelo tesoureiro no envio de recibos.
+4. **Excluir Usuário (ícone de lixeira):** remove permanentemente a conta da equipe (não permite excluir a própria conta logada).
 
-> **Dica:** para o tesoureiro conseguir fazer lançamentos, ele **precisa** estar vinculado a uma **congregação**. Sem congregação vinculada, o painel financeiro não carrega.
+> **Dica:** para o tesoureiro ou dirigente acessar o painel financeiro da igreja, ele **precisa** estar vinculado a uma **congregação** e o número de WhatsApp cadastrado deve bater com o celular usado por ele caso envie recibos via WhatsApp.
 
 ---
 
-## 4. Visão do Tesoureiro (O dia a dia)
+## 4. Visão do Tesoureiro e Conferência de Recibos (1ª Via × 2ª Via)
 
-Ao logar como **Tesoureiro**, você verá um painel dividido em duas abas principais: **Financeiro (Meses)** e **Dizimistas / Ofertantes**.
+Ao acessar o painel financeiro (como **Tesoureiro**, ou selecionando a congregação como **Pastor / Administrador**), você verá as abas: **Financeiro (Meses)**, **Despesas** e **Dizimistas / Ofertantes**.
 
-### Aba 1: Dizimistas / Ofertantes (Cadastro de Membros)
+### Aba Dizimistas / Ofertantes (Cadastro de Membros)
 Recomendamos que você cadastre os membros da sua congregação antes de começar a lançar finanças.
 
 *   **Para Cadastrar:** Preencha o formulário ("Novo Dizimista/Ofertante") com Nome, E-mail e Telefone, e clique em "Cadastrar".
 *   **Para Excluir:** Na lista, encontre o nome do membro e clique no botão de lixeira (apenas se ele não possuir rendas vinculadas).
 
-### Aba 2: Financeiro (Meses)
+### Aba Financeiro (Meses)
 Esta é a área onde toda a movimentação financeira acontece. O trabalho é organizado por Meses e Semanas.
 
 #### 1. Criar um Novo Mês
@@ -164,21 +173,45 @@ Despesas representam as contas pagas pela igreja.
 
 > **Despesas recorrentes:** é possível marcar uma despesa como recorrente (semanal, quinzenal ou mensal). O sistema pode duplicá-la automaticamente para o próximo período.
 
+#### 5. Conferência Inteligente de Recibos (OCR + 1ª Via × 2ª Via)
+Dentro de cada semana, o painel **Recibos (OCR + Foto)** permite conferir e lançar os recibos manuscritos com apoio de inteligência artificial e cruzamento automático entre a **1ª via branca** e a **2ª via azul**:
+
+1. **Envio da 1ª Via Branca pelo Tesoureiro:**
+   - **Pelo WhatsApp:** se o WhatsApp do tesoureiro estiver cadastrado em **"Cadastros e Equipe"**, basta ele tirar foto do recibo e enviar para o WhatsApp conectado do sistema. A foto cai automaticamente na fila de conferência da semana corrente da sua congregação.
+   - **Pela Câmera no Celular:** tocando em **"Fotografar 1ª Via (Câmera)"** diretamente dentro da semana.
+2. **Envio da 2ª Via Azul pelo Pastor (Scanner):**
+   - Clique em **Enviar** para anexar o PDF ou imagem escaneada (ex.: folha A4 da Epson L3110 com até 4 recibos por página).
+   - O sistema recorta cada recibo individualmente, gira automaticamente fotos deitadas ou de cabeça para baixo e lê os campos manuscritos: data, `Nº Recibo`, tipo (`Dízimo` ou `Oferta`), valor numérico e por extenso (*"Importância Supra de"*) e cruza o nome do contribuinte com o cadastro de membros.
+3. **Pareamento Automático 1ª × 2ª Via:**
+   - Quando a 1ª via branca e a 2ª via azul possuem o mesmo `Nº Recibo`, o sistema as pareia automaticamente na semana:
+     - **"1ª e 2ª Vias Conferem" (verde):** os valores são idênticos. Você pode lançar todos de uma vez com o botão **"Confirmar todos que conferem (N) (1ª = 2ª via)"** ou conferir um a um.
+     - **"Divergência 1ª × 2ª Via" (vermelho):** os valores diferem entre as vias. Ao abrir o recibo, as duas imagens aparecem **lado a lado** (*1ª Via enviada pelo Tesoureiro* e *2ª Via escaneada em Casa*) para auditoria visual.
+   - Alertas automáticos também avisam caso haja diferença entre o numeral e o valor por extenso ou na identificação do contribuinte.
+
+#### 6. Agradecimento por WhatsApp
+Com o telefone dos dizimistas cadastrado na aba **Dizimistas / Ofertantes**:
+
+- **Individual:** passe o mouse sobre uma renda lançada na semana e clique no ícone verde de **WhatsApp** (*"Agradecer por WhatsApp"*). O sistema envia a mensagem de agradecimento já com a foto do recibo (quando vinculada).
+- **Em lote na semana:** clique em **"Agradecer todos (WhatsApp)"** no rodapé da semana para enviar aos membros com telefone cadastrado (pulando os que já receberam agradecimento ou não têm telefone).
+
 ---
 
-## 5. Fechamento de Mês e Relatórios
+## 5. Fechamento de Mês, Planilhas e Relatórios
 
 Esta é a etapa mais importante para a segurança e transparência financeira.
 
-### Como gerar o Relatório (Balancete) em PDF
-1. Expanda o painel do mês desejado.
-2. No topo do painel do mês, clique no botão **"Gerar PDF"**.
-3. Uma nova aba do seu navegador se abrirá exibindo o relatório formatado e pronto para impressão ou envio por WhatsApp/Email.
+### Relatórios PDF e Planilhas XLSX
+Ao expandir um mês, você conta com as seguintes exportações:
+
+1. **Balancete (PDF):** relatório contábil completo pronto para impressão ou envio por WhatsApp/Email (entradas, saídas, comissão de 33% e saldo final).
+2. **Lista de Dizimistas (PDF):** lista limpa com os nomes dos dizimistas/contribuintes do mês **sem exibir valores**, ideal para mural ou leitura em culto.
+3. **Planilha do mês (XLSX):** arquivo Excel com aba de resumo e uma aba detalhada por semana.
+4. **Planilha da semana (XLSX):** dentro de cada semana, gera o Excel com data, recibo, nome, valor, total e cálculo automático de 33%.
 
 ### O Fechamento do Mês (Cadeado)
-Após lançar todas as rendas e despesas do mês, bater o caixa físico e gerar o relatório em PDF final para prestação de contas, você deve **Fechar o Mês**.
+Após lançar todas as rendas e despesas do mês, bater o caixa físico e gerar os relatórios finais para prestação de contas, você deve **Fechar o Mês**.
 
-1. Clique no botão **"Fechar Mês"** (que fica ao lado do botão de PDF).
+1. Clique no botão **"Fechar Mês"**.
 2. O sistema pedirá uma confirmação.
 3. **ATENÇÃO:** Ao fechar o mês, ele fica com um cadeado vermelho na lista. Isso significa que os botões de "+ Nova" Renda ou Despesa, bem como os botões de exclusão (lixeiras) somem. Ninguém poderá alterar os valores daquele mês para garantir a fidelidade do relatório impresso.
 
