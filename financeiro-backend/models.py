@@ -91,6 +91,7 @@ class Renda(Base): # Novo Modelo
 class Usuario(Base):
     __tablename__ = 'usuarios'
     id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     funcao = Column(String, nullable=False)

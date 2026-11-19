@@ -144,6 +144,7 @@ def delete_congregacao(db: Session, congregacao_id: int):
 def create_user(db: Session, user: schemas.UsuarioCreate, *, commit: bool = True):
     hashed_password = security.get_password_hash(user.password)
     db_user = models.Usuario(
+        nome=(user.nome or "").strip() or None,
         email=user.email,
         hashed_password=hashed_password,
         funcao=user.funcao,

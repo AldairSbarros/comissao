@@ -220,12 +220,23 @@ class DenominacaoStatusUpdate(BaseModel):
     is_active: bool
 
 class UsuarioBase(BaseModel):
+    nome: Optional[str] = None
     email: EmailStr
     telefone: Optional[str] = None
 
 
 class UsuarioTelefoneUpdate(BaseModel):
     telefone: Optional[str] = None
+
+
+class UsuarioUpdate(BaseModel):
+    nome: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    funcao: Optional[str] = None
+    telefone: Optional[str] = None
+    area_id: Optional[int] = None
+    congregacao_id: Optional[int] = None
 
 class UsuarioCreate(UsuarioBase):
     password: str

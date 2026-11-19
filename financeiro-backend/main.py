@@ -644,25 +644,25 @@ def create_user_in_denominacao(
     return crud.create_user(db=db, user=user)
 
 
-@app.put("/denominacoes/{denominacao_id}/usuarios/{user_id}/telefone", response_model=schemas.Usuario)
-def update_user_telefone_in_denominacao(
+def _obter_usuario_gerenciavel_na_denominacao(
+    db: Session,
     denominacao_id: int,
     user_id: int,
-    payload: schemas.UsuarioTelefoneUpdate,
-    db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(get_current_user),
-):
+    current_user: models.Usuario,
+) -> models.Usuario:
     if current_user.is_superuser or current_user.funcao == "administrador":
         pass
     elif current_user.funcao in ("supervisor_denominacao", "supervisor_area"):
         if current_user.denominacao_id != denominacao_id:
             raise HTTPException(status_code=403, detail="Acesso negado. Você não pertence a esta denominação.")
     else:
-        raise HTTPException(status_code=403, detail="Acesso negado. Apenas administradores ou supervisores podem atualizar telefones.")
+        raise HTTPException(status_code=403, detail="Acesso negado. Apenas administradores ou supervisores podem gerenciar usuários.")
 
     db_user = crud.get_user_by_id(db, user_id=user_id)
     if not db_user or db_user.denominacao_id != denominacao_id:
         raise HTTPException(status_code=404, detail="Usuário não encontrado nesta denominação.")
+    if db_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Superusuário não pode ser alterado ou excluído por este painel.")
 
     if current_user.funcao == "supervisor_area":
         if db_user.congregacao_id:
@@ -671,11 +671,100 @@ def update_user_telefone_in_denominacao(
                 raise HTTPException(status_code=403, detail="Acesso negado. Usuário fora da sua área.")
         elif db_user.area_id != current_user.area_id:
             raise HTTPException(status_code=403, detail="Acesso negado. Usuário fora da sua área.")
+    return db_user
 
+
+@app.put("/denominacoes/{denominacao_id}/usuarios/{user_id}/telefone", response_model=schemas.Usuario)
+def update_user_telefone_in_denominacao(
+    denominacao_id: int,
+    user_id: int,
+    payload: schemas.UsuarioTelefoneUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    db_user = _obter_usuario_gerenciavel_na_denominacao(db, denominacao_id, user_id, current_user)
     db_user.telefone = (payload.telefone or "").strip() or None
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@app.put("/denominacoes/{denominacao_id}/usuarios/{user_id}", response_model=schemas.Usuario)
+def update_user_in_denominacao(
+    denominacao_id: int,
+    user_id: int,
+    payload: schemas.UsuarioUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    db_user = _obter_usuario_gerenciavel_na_denominacao(db, denominacao_id, user_id, current_user)
+
+    if payload.email is not None and payload.email != db_user.email:
+        if crud.get_user_by_email(db, email=payload.email):
+            raise HTTPException(status_code=400, detail="Email already registered")
+        db_user.email = payload.email
+
+    if payload.nome is not None:
+        db_user.nome = payload.nome.strip() or None
+
+    if payload.telefone is not None:
+        db_user.telefone = payload.telefone.strip() or None
+
+    if payload.password is not None and payload.password.strip():
+        db_user.hashed_password = security.get_password_hash(payload.password)
+
+    nova_funcao = payload.funcao if payload.funcao is not None else db_user.funcao
+    if payload.funcao is not None:
+        if nova_funcao not in TENANT_ROLES:
+            raise HTTPException(status_code=400, detail="Funcao de usuario invalida.")
+        if current_user.funcao == "supervisor_denominacao" and nova_funcao in {"administrador", "supervisor_denominacao"}:
+            raise HTTPException(status_code=403, detail="Supervisores de denominação só podem atribuir supervisor de área, tesoureiro ou dirigente.")
+        if current_user.funcao == "supervisor_area" and nova_funcao != "tesoureiro":
+            raise HTTPException(status_code=403, detail="Supervisores de área só podem atribuir a função de tesoureiro.")
+        db_user.funcao = nova_funcao
+
+    if nova_funcao in ("tesoureiro", "dirigente"):
+        cong_id = payload.congregacao_id if payload.congregacao_id is not None else db_user.congregacao_id
+        if not cong_id:
+            raise HTTPException(status_code=400, detail=f"{nova_funcao.capitalize()}s devem ser vinculados a uma congregação.")
+        db_cong = crud.get_congregacao_by_id(db, cong_id)
+        if not db_cong or db_cong.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=400, detail="Congregação inválida para esta denominação.")
+        if current_user.funcao == "supervisor_area" and db_cong.area_id != current_user.area_id:
+            raise HTTPException(status_code=403, detail="Congregação fora da sua área.")
+        db_user.congregacao_id = cong_id
+        db_user.area_id = None
+    elif nova_funcao == "supervisor_area":
+        area_id = payload.area_id if payload.area_id is not None else db_user.area_id
+        if not area_id:
+            raise HTTPException(status_code=400, detail="Supervisores de área devem ser vinculados a uma área.")
+        db_area = crud.get_area_eclesiastica_by_id(db, area_id)
+        if not db_area or db_area.denominacao_id != denominacao_id:
+            raise HTTPException(status_code=400, detail="Área inválida para esta denominação.")
+        db_user.area_id = area_id
+        db_user.congregacao_id = None
+    else:
+        db_user.congregacao_id = None
+        db_user.area_id = None
+
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+@app.delete("/denominacoes/{denominacao_id}/usuarios/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_in_denominacao(
+    denominacao_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    db_user = _obter_usuario_gerenciavel_na_denominacao(db, denominacao_id, user_id, current_user)
+    if db_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Você não pode excluir sua própria conta.")
+    db.delete(db_user)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.get("/users/me/", response_model=schemas.Usuario)
 def read_users_me(current_user: models.Usuario = Depends(get_current_user)):

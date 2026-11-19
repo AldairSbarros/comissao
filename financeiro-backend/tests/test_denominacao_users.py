@@ -272,3 +272,64 @@ def test_listar_usuarios_denominacao_outra_denominacao_403(client: TestClient, s
     )
 
     assert response.status_code == 403
+
+
+def test_admin_edita_e_exclui_usuario_com_nome(client: TestClient, setup_data: dict):
+    token_admin = setup_data["tokens"]["admin"]
+    denominacao_id = setup_data["denominacoes"]["denominacao1"].id
+    cong1 = setup_data["congregacoes"]["congregacao1_area1"].id
+    cong2 = setup_data["congregacoes"]["congregacao2_area1"].id
+
+    criado = client.post(
+        f"/denominacoes/{denominacao_id}/usuarios/",
+        headers={"Authorization": f"Bearer {token_admin}"},
+        json={
+            "nome": "Mauro Teste",
+            "email": "mauro.teste@example.com",
+            "password": "senha1",
+            "funcao": "tesoureiro",
+            "telefone": "(92) 99111-2222",
+            "congregacao_id": cong1,
+        },
+    )
+    assert criado.status_code == 201, criado.text
+    uid = criado.json()["id"]
+    assert criado.json()["nome"] == "Mauro Teste"
+
+    editado = client.put(
+        f"/denominacoes/{denominacao_id}/usuarios/{uid}",
+        headers={"Authorization": f"Bearer {token_admin}"},
+        json={
+            "nome": "Mauro Augusto",
+            "email": "mauro.augusto@example.com",
+            "telefone": "(92) 99222-3333",
+            "funcao": "tesoureiro",
+            "congregacao_id": cong2,
+        },
+    )
+    assert editado.status_code == 200, editado.text
+    corpo = editado.json()
+    assert corpo["nome"] == "Mauro Augusto"
+    assert corpo["email"] == "mauro.augusto@example.com"
+    assert corpo["telefone"] == "(92) 99222-3333"
+    assert corpo["congregacao_id"] == cong2
+
+    # Nao pode excluir a si mesmo
+    admin_id = setup_data["users"]["admin"].id
+    auto = client.delete(
+        f"/denominacoes/{denominacao_id}/usuarios/{admin_id}",
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+    assert auto.status_code == 400
+
+    # Exclusao de outro usuario da denominacao funciona
+    excluido = client.delete(
+        f"/denominacoes/{denominacao_id}/usuarios/{uid}",
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+    assert excluido.status_code == 204
+    lista = client.get(
+        f"/denominacoes/{denominacao_id}/usuarios/",
+        headers={"Authorization": f"Bearer {token_admin}"},
+    ).json()
+    assert all(u["id"] != uid for u in lista)

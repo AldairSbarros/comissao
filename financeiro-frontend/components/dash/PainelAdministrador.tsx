@@ -10,7 +10,8 @@ import {
   criarArea, atualizarArea, removerArea, listarAreasPorDenominacao,
   criarCongregacao, atualizarCongregacao, removerCongregacao,
   listarCongregacoesPorDenominacao, getDenominacao,
-  listarUsuariosPorDenominacao, criarUsuarioNaDenominacao, atualizarTelefoneUsuario,
+  listarUsuariosPorDenominacao, criarUsuarioNaDenominacao,
+  atualizarUsuarioNaDenominacao, removerUsuarioNaDenominacao, atualizarTelefoneUsuario,
 } from "@/lib/api";
 import { AreaEclesiastica, Congregacao, Usuario } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +63,16 @@ export default function PainelAdministrador() {
   // Usuários
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [novoUsuario, setNovoUsuario] = useState({ email: "", password: "", funcao: "tesoureiro", telefone: "", congregacao_id: "" as number | "" });
+  const [usuarioEmEdicao, setUsuarioEmEdicao] = useState<Usuario | null>(null);
+  const [novoUsuario, setNovoUsuario] = useState({
+    nome: "",
+    email: "",
+    password: "",
+    funcao: "tesoureiro",
+    telefone: "",
+    area_id: "" as number | "",
+    congregacao_id: "" as number | "",
+  });
   const [usuarioEditandoTelefone, setUsuarioEditandoTelefone] = useState<Usuario | null>(null);
   const [telefoneEdicao, setTelefoneEdicao] = useState("");
 
@@ -223,7 +233,30 @@ export default function PainelAdministrador() {
 
   // --- Usuários ---
   const abrirNovoUsuario = () => {
-    setNovoUsuario({ email: "", password: "", funcao: "tesoureiro", telefone: "", congregacao_id: "" });
+    setUsuarioEmEdicao(null);
+    setNovoUsuario({
+      nome: "",
+      email: "",
+      password: "",
+      funcao: "tesoureiro",
+      telefone: "",
+      area_id: "",
+      congregacao_id: "",
+    });
+    setIsUserModalOpen(true);
+  };
+
+  const abrirEditarUsuario = (usuario: Usuario) => {
+    setUsuarioEmEdicao(usuario);
+    setNovoUsuario({
+      nome: usuario.nome ?? "",
+      email: usuario.email,
+      password: "",
+      funcao: usuario.funcao,
+      telefone: usuario.telefone ?? "",
+      area_id: usuario.area_id ?? "",
+      congregacao_id: usuario.congregacao_id ?? "",
+    });
     setIsUserModalOpen(true);
   };
 
@@ -238,7 +271,7 @@ export default function PainelAdministrador() {
     setIsSaving(true);
     try {
       await atualizarTelefoneUsuario(denominacaoId, usuarioEditandoTelefone.id, telefoneEdicao.trim() || null);
-      toast.success(`WhatsApp de "${usuarioEditandoTelefone.email}" atualizado.`);
+      toast.success(`WhatsApp de "${usuarioEditandoTelefone.nome || usuarioEditandoTelefone.email}" atualizado.`);
       setUsuarioEditandoTelefone(null);
       await carregarDados();
     } catch (error) {
@@ -248,32 +281,82 @@ export default function PainelAdministrador() {
     }
   };
 
-  const handleCriarUsuario = async (e: React.FormEvent) => {
+  const handleSalvarUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!denominacaoId || !novoUsuario.email.trim() || !novoUsuario.password || isSaving) return;
+    if (!denominacaoId || !novoUsuario.email.trim() || isSaving) return;
+    if (!usuarioEmEdicao && !novoUsuario.password) {
+      toast.warning("Informe a senha inicial do usuário.");
+      return;
+    }
+    if ((novoUsuario.funcao === "tesoureiro" || novoUsuario.funcao === "dirigente") && novoUsuario.congregacao_id === "") {
+      toast.warning(`Selecione a congregação do ${novoUsuario.funcao}.`);
+      return;
+    }
+    if (novoUsuario.funcao === "supervisor_area" && novoUsuario.area_id === "") {
+      toast.warning("Selecione a área do supervisor.");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const payload: { email: string; password: string; funcao: string; telefone?: string; congregacao_id?: number; area_id?: number } = {
-        email: novoUsuario.email.trim(),
-        password: novoUsuario.password,
-        funcao: novoUsuario.funcao,
-        telefone: novoUsuario.telefone.trim() || undefined,
-      };
-      if (novoUsuario.funcao === "tesoureiro" || novoUsuario.funcao === "dirigente") {
-        if (novoUsuario.congregacao_id === "") {
-          toast.warning(`Selecione a congregação do ${novoUsuario.funcao}.`);
-          return;
+      if (usuarioEmEdicao) {
+        const payload = {
+          nome: novoUsuario.nome.trim() || null,
+          email: novoUsuario.email.trim(),
+          funcao: novoUsuario.funcao,
+          telefone: novoUsuario.telefone.trim() || null,
+          ...(novoUsuario.password.trim() ? { password: novoUsuario.password } : {}),
+          ...(novoUsuario.funcao === "tesoureiro" || novoUsuario.funcao === "dirigente"
+            ? { congregacao_id: novoUsuario.congregacao_id as number, area_id: null }
+            : novoUsuario.funcao === "supervisor_area"
+              ? { area_id: novoUsuario.area_id as number, congregacao_id: null }
+              : { area_id: null, congregacao_id: null }),
+        };
+        await atualizarUsuarioNaDenominacao(denominacaoId, usuarioEmEdicao.id, payload);
+        toast.success(`Usuário "${payload.nome || payload.email}" atualizado.`);
+      } else {
+        const payload: {
+          nome?: string;
+          email: string;
+          password: string;
+          funcao: string;
+          telefone?: string;
+          congregacao_id?: number;
+          area_id?: number;
+        } = {
+          nome: novoUsuario.nome.trim() || undefined,
+          email: novoUsuario.email.trim(),
+          password: novoUsuario.password,
+          funcao: novoUsuario.funcao,
+          telefone: novoUsuario.telefone.trim() || undefined,
+        };
+        if (novoUsuario.funcao === "tesoureiro" || novoUsuario.funcao === "dirigente") {
+          payload.congregacao_id = novoUsuario.congregacao_id as number;
+        } else if (novoUsuario.funcao === "supervisor_area") {
+          payload.area_id = novoUsuario.area_id as number;
         }
-        payload.congregacao_id = novoUsuario.congregacao_id;
+        await criarUsuarioNaDenominacao(denominacaoId, payload);
+        toast.success(`Usuário "${payload.nome || payload.email}" criado.`);
       }
-      await criarUsuarioNaDenominacao(denominacaoId, payload);
-      toast.success(`Usuário "${payload.email}" criado.`);
       setIsUserModalOpen(false);
       await carregarDados();
     } catch (error) {
-      toast.error(detalheErro(error) || "Erro ao criar o usuário.");
+      toast.error(detalheErro(error) || "Erro ao salvar o usuário.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRemoverUsuario = async (usuario: Usuario) => {
+    if (!denominacaoId) return;
+    const rotulo = usuario.nome ? `${usuario.nome} (${usuario.email})` : usuario.email;
+    if (!confirm(`Excluir o usuário "${rotulo}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await removerUsuarioNaDenominacao(denominacaoId, usuario.id);
+      toast.success(`Usuário "${rotulo}" excluído.`);
+      await carregarDados();
+    } catch (error) {
+      toast.error(detalheErro(error) || "Erro ao excluir o usuário.");
     }
   };
 
@@ -425,17 +508,20 @@ export default function PainelAdministrador() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-border">
+                    <th className="py-2 pr-4 font-medium">Nome</th>
                     <th className="py-2 pr-4 font-medium">E-mail</th>
                     <th className="py-2 pr-4 font-medium">Função</th>
                     <th className="py-2 pr-4 font-medium">Vínculo</th>
                     <th className="py-2 pr-4 font-medium">WhatsApp</th>
                     <th className="py-2 pr-4 font-medium">Status</th>
+                    {podeGerenciarUsuarios && <th className="py-2 text-right font-medium">Ações</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {usuarios.map((u) => (
                     <tr key={u.id} className="border-b border-border last:border-b-0">
-                      <td className="py-2 pr-4">{u.email}</td>
+                      <td className="py-2 pr-4 font-medium">{u.nome || "—"}</td>
+                      <td className="py-2 pr-4 text-muted-foreground">{u.email}</td>
                       <td className="py-2 pr-4 text-muted-foreground">{FUNCAO_LABEL[u.funcao] ?? u.funcao}</td>
                       <td className="py-2 pr-4 text-muted-foreground">
                         {u.congregacao_id
@@ -467,6 +553,31 @@ export default function PainelAdministrador() {
                           <Badge className="bg-green-500/15 text-green-400 border-green-500/30">Ativo</Badge>
                         )}
                       </td>
+                      {podeGerenciarUsuarios && (
+                        <td className="py-2 text-right">
+                          <span className="inline-flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              title="Editar usuário"
+                              onClick={() => abrirEditarUsuario(u)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-500"
+                              title={u.email === user?.sub ? "Você não pode excluir sua própria conta" : "Excluir usuário"}
+                              disabled={u.email === user?.sub}
+                              onClick={() => handleRemoverUsuario(u)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </span>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -555,14 +666,27 @@ export default function PainelAdministrador() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal: Novo Usuário */}
+      {/* Modal: Novo/Editar Usuário */}
       <Dialog open={isUserModalOpen} onOpenChange={setIsUserModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Novo Usuário</DialogTitle>
-            <DialogDescription>Cadastre um membro da equipe desta denominação.</DialogDescription>
+            <DialogTitle>{usuarioEmEdicao ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
+            <DialogDescription>
+              {usuarioEmEdicao
+                ? "Atualize os dados do membro da equipe."
+                : "Cadastre um membro da equipe desta denominação."}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCriarUsuario} className="space-y-4">
+          <form onSubmit={handleSalvarUsuario} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="usuario_nome">Nome</Label>
+              <Input
+                id="usuario_nome"
+                value={novoUsuario.nome}
+                onChange={(e) => setNovoUsuario(prev => ({ ...prev, nome: e.target.value }))}
+                placeholder="Ex: Mauro Augusto"
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="usuario_email">E-mail *</Label>
               <Input
@@ -576,15 +700,17 @@ export default function PainelAdministrador() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="usuario_password">Senha *</Label>
+              <Label htmlFor="usuario_password">
+                {usuarioEmEdicao ? "Nova Senha (opcional)" : "Senha *"}
+              </Label>
               <Input
                 id="usuario_password"
                 type="password"
                 value={novoUsuario.password}
                 onChange={(e) => setNovoUsuario(prev => ({ ...prev, password: e.target.value }))}
-                placeholder="Senha inicial"
+                placeholder={usuarioEmEdicao ? "Deixe em branco para manter a senha atual" : "Senha inicial"}
                 autoComplete="new-password"
-                required
+                required={!usuarioEmEdicao}
               />
             </div>
             <div className="space-y-2">
@@ -601,7 +727,7 @@ export default function PainelAdministrador() {
               <select
                 id="usuario_funcao"
                 value={novoUsuario.funcao}
-                onChange={(e) => setNovoUsuario(prev => ({ ...prev, funcao: e.target.value, congregacao_id: "" }))}
+                onChange={(e) => setNovoUsuario(prev => ({ ...prev, funcao: e.target.value, congregacao_id: "", area_id: "" }))}
                 className="w-full border-input bg-transparent rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {funcoesDisponiveis.map((f) => (
@@ -628,9 +754,27 @@ export default function PainelAdministrador() {
                 )}
               </div>
             )}
+            {novoUsuario.funcao === "supervisor_area" && (
+              <div className="space-y-2">
+                <Label htmlFor="usuario_area">Área *</Label>
+                <select
+                  id="usuario_area"
+                  value={novoUsuario.area_id}
+                  onChange={(e) => setNovoUsuario(prev => ({ ...prev, area_id: e.target.value === "" ? "" : Number(e.target.value) }))}
+                  className="w-full border-input bg-transparent rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Selecione a área</option>
+                  {areas.map((a) => (
+                    <option key={a.id} value={a.id}>{a.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsUserModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSaving}>{isSaving ? "Criando..." : "Criar Usuário"}</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "Salvando..." : usuarioEmEdicao ? "Salvar Alterações" : "Criar Usuário"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

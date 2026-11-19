@@ -95,6 +95,7 @@ export interface Mes {
 
 export interface Usuario {
   id: number;
+  nome?: string | null;
   email: string;
   funcao: string;
   telefone?: string | null;
@@ -174,6 +175,7 @@ export interface CongregacaoUpdateData {
 }
 
 export interface UsuarioCreateData {
+  nome?: string;
   email: string;
   password: string;
   funcao: string;
@@ -181,6 +183,16 @@ export interface UsuarioCreateData {
   denominacao_id: number;
   area_id?: number;
   congregacao_id?: number;
+}
+
+export interface UsuarioUpdateData {
+  nome?: string | null;
+  email?: string;
+  password?: string;
+  funcao?: string;
+  telefone?: string | null;
+  area_id?: number | null;
+  congregacao_id?: number | null;
 }
 
 // --- Schemas de Gestão (Painel Master) ---

@@ -3,7 +3,7 @@ import axios, { AxiosInstance } from 'axios';
 import {
   Despesa, DespesaCreateData, Mes, Semana, Usuario, Denominacao,
   DenominacaoCreateData, AreaEclesiastica, AreaEclesiasticaCreateData, AreaEclesiasticaUpdateData,
-  Congregacao, CongregacaoCreateData, CongregacaoUpdateData, UsuarioCreateData, DizimistaOfertante,
+  Congregacao, CongregacaoCreateData, CongregacaoUpdateData, UsuarioCreateData, UsuarioUpdateData, DizimistaOfertante,
   DizimistaOfertanteCreateData, DizimistaOfertanteUpdateData, Renda,
   RendaCreateData, AnaliseMes, UserPasswordReset, UserStatusUpdate, TenantRename,
   ReciboPendente, ReciboConfirmarData
@@ -246,6 +246,13 @@ export const listarUsuariosPorDenominacao = async (denominacaoId: number): Promi
 export const criarUsuarioNaDenominacao = async (denominacaoId: number, userData: Omit<UsuarioCreateData, "denominacao_id">): Promise<Usuario> => {
     const response = await api.post(`/denominacoes/${denominacaoId}/usuarios/`, userData);
     return response.data;
+}
+export const atualizarUsuarioNaDenominacao = async (denominacaoId: number, userId: number, userData: UsuarioUpdateData): Promise<Usuario> => {
+    const response = await api.put(`/denominacoes/${denominacaoId}/usuarios/${userId}`, userData);
+    return response.data;
+}
+export const removerUsuarioNaDenominacao = async (denominacaoId: number, userId: number): Promise<void> => {
+    await api.delete(`/denominacoes/${denominacaoId}/usuarios/${userId}`);
 }
 export const atualizarTelefoneUsuario = async (denominacaoId: number, userId: number, telefone: string | null): Promise<Usuario> => {
     const response = await api.put(`/denominacoes/${denominacaoId}/usuarios/${userId}/telefone`, { telefone });
