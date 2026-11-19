@@ -22,6 +22,10 @@ def _envelope_muse(texto: str) -> dict:
     return {"choices": [{"message": {"role": "assistant", "content": texto}}]}
 
 
+def _envelope_claude(texto: str) -> dict:
+    return {"content": [{"type": "text", "text": texto}]}
+
+
 # --- Provedor padrao: muse ---
 
 def test_provedor_padrao_e_muse(monkeypatch):
@@ -177,3 +181,94 @@ def test_extrair_recibos_multiplos_e_rotacao(monkeypatch):
     assert resultados[1]["box_2d"] == [10.0, 510.0, 490.0, 990.0]
     assert resultados[2]["tipo"] == "Oferta"
     assert resultados[2]["divergencia_valor"] is True
+
+
+# --- Provedor alternativo: claude ---
+
+def test_claude_sem_chave_indisponivel(monkeypatch):
+    monkeypatch.setenv("OCR_PROVIDER", "claude")
+    monkeypatch.delenv("CLAUDE_SS_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_SS_BASE_URL", raising=False)
+    assert ocr.ocr_disponivel() is False
+    with pytest.raises(RuntimeError):
+        ocr.extrair_recibo(b"fake")
+
+
+def test_claude_extracao_ok(monkeypatch):
+    monkeypatch.setenv("OCR_PROVIDER", "claude")
+    monkeypatch.setenv("CLAUDE_SS_API_KEY", "chave-fake")
+    monkeypatch.setenv("CLAUDE_SS_BASE_URL", "https://claude-ss.ia.br")
+    chamadas = {}
+
+    def fake_post(url, headers=None, json=None, params=None, timeout=None):
+        chamadas["url"] = url
+        chamadas["headers"] = headers
+        chamadas["json"] = json
+        return _RespostaFake(200, _envelope_claude(
+            '{"data": "2026-02-03", "numero_recibo": "555", "nome": "Jose da Silva", "valor": 150.5}'
+        ))
+
+    monkeypatch.setattr(ocr.httpx, "post", fake_post)
+    resultado = ocr.extrair_recibo(b"bytes-da-imagem")
+    assert resultado == {"data": "2026-02-03", "numero_recibo": "555", "nome": "Jose da Silva", "valor": 150.5}
+    assert chamadas["url"] == "https://claude-ss.ia.br/v1/messages"
+    assert chamadas["headers"]["x-api-key"] == "chave-fake"
+    assert chamadas["headers"]["anthropic-version"] == "2023-06-01"
+    assert chamadas["json"]["model"] == "claude-sonnet-4-6"
+    partes = chamadas["json"]["messages"][0]["content"]
+    assert partes[0]["type"] == "text"
+    assert partes[1]["type"] == "image"
+    assert partes[1]["source"]["type"] == "base64"
+    assert partes[1]["source"]["media_type"] == "image/png"
+
+
+def test_claude_tolera_cerca_markdown_e_valor_br(monkeypatch):
+    monkeypatch.setenv("OCR_PROVIDER", "claude")
+    monkeypatch.setenv("CLAUDE_SS_API_KEY", "chave-fake")
+    monkeypatch.setenv("CLAUDE_SS_BASE_URL", "https://claude-ss.ia.br")
+
+    def fake_post(url, headers=None, json=None, params=None, timeout=None):
+        return _RespostaFake(200, _envelope_claude(
+            '```json\n{"data": null, "numero_recibo": null, "nome": null, "valor": "R$ 1.200,50"}\n```'
+        ))
+
+    monkeypatch.setattr(ocr.httpx, "post", fake_post)
+    assert ocr.extrair_recibo(b"x") == {"data": None, "numero_recibo": None, "nome": None, "valor": 1200.50}
+
+
+def test_claude_http_erro_vira_value_error(monkeypatch):
+    monkeypatch.setenv("OCR_PROVIDER", "claude")
+    monkeypatch.setenv("CLAUDE_SS_API_KEY", "chave-fake")
+    monkeypatch.setenv("CLAUDE_SS_BASE_URL", "https://claude-ss.ia.br")
+
+    def fake_post(url, headers=None, json=None, params=None, timeout=None):
+        return _RespostaFake(401, {}, texto="unauthorized")
+
+    monkeypatch.setattr(ocr.httpx, "post", fake_post)
+    with pytest.raises(ValueError, match="HTTP 401"):
+        ocr.extrair_recibo(b"x")
+
+
+def test_claude_extrair_recibos_multiplos(monkeypatch):
+    monkeypatch.setenv("OCR_PROVIDER", "claude")
+    monkeypatch.setenv("CLAUDE_SS_API_KEY", "chave-fake")
+    monkeypatch.setenv("CLAUDE_SS_BASE_URL", "https://claude-ss.ia.br")
+
+    def fake_post(url, headers=None, json=None, params=None, timeout=None):
+        return _RespostaFake(200, _envelope_claude(
+            '{"recibos": ['
+            '{"data": "2026-10-04", "numero_recibo": "314856", "nome": "Nicolly Neri", "valor": 50, '
+            '"tipo": "Dízimo", "rotacao_graus": 0, "box_2d": [10, 10, 490, 490]}, '
+            '{"data": "2026-10-04", "numero_recibo": "314859", "nome": "Gabriel de Menezes", "valor": 10, '
+            '"tipo": "Dízimo", "rotacao_graus": 90, "box_2d": [10, 510, 490, 990]}'
+            ']}'
+        ))
+
+    monkeypatch.setattr(ocr.httpx, "post", fake_post)
+    resultados = ocr.extrair_recibos(b"folha-2-recibos")
+    assert len(resultados) == 2
+    assert resultados[0]["numero_recibo"] == "314856"
+    assert resultados[0]["rotacao_graus"] == 0
+    assert resultados[1]["numero_recibo"] == "314859"
+    assert resultados[1]["rotacao_graus"] == 90
+    assert resultados[1]["box_2d"] == [10.0, 510.0, 490.0, 990.0]

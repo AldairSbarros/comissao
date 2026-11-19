@@ -14,6 +14,9 @@ Provedores (variavel OCR_PROVIDER, default: muse):
   OCR_MUSE_MODEL (default muse-spark-1.3).
 - gemini: Google AI Studio (generateContent).
   ENV: GEMINI_API_KEY (obrigatoria), OCR_GEMINI_MODEL (default gemini-2.0-flash).
+- claude: Anthropic Messages API (OpenAI-compatible via proxy ou direto).
+  ENV: CLAUDE_SS_API_KEY (obrigatoria), CLAUDE_SS_BASE_URL (obrigatorio),
+  OCR_CLAUDE_MODEL (default claude-opus-5).
 """
 import base64
 import json
@@ -42,8 +45,11 @@ def provedor() -> str:
 
 def ocr_disponivel() -> bool:
     """True quando o provedor selecionado tem chave configurada."""
-    if provedor() == "gemini":
+    p = provedor()
+    if p == "gemini":
         return bool(os.environ.get("GEMINI_API_KEY"))
+    if p == "claude":
+        return bool(os.environ.get("CLAUDE_SS_API_KEY") and os.environ.get("CLAUDE_SS_BASE_URL"))
     return bool(os.environ.get("MODEL_API_KEY"))
 
 
@@ -360,6 +366,66 @@ def _chamar_gemini(
         raise ValueError(f"Resposta inesperada do OCR: {resp.text[:300]}") from exc
 
 
+def _chamar_claude(
+    imagem_bytes: bytes,
+    mime: str,
+    ano: int,
+    nomes_conhecidos: list[str] | None = None,
+    multiplos: bool = False,
+) -> tuple[str, str]:
+    api_key = os.environ.get("CLAUDE_SS_API_KEY")
+    base_url = os.environ.get("CLAUDE_SS_BASE_URL")
+    if not api_key or not base_url:
+        raise RuntimeError("OCR indisponivel: defina CLAUDE_SS_API_KEY e CLAUDE_SS_BASE_URL no ambiente.")
+    modelo = os.environ.get("OCR_CLAUDE_MODEL", "claude-sonnet-4-6")
+    url = f"{base_url.rstrip('/')}/v1/messages"
+    payload = {
+        "model": modelo,
+        "max_tokens": 4096,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": _prompt(ano, nomes_conhecidos=nomes_conhecidos, multiplos=multiplos)},
+                {"type": "image", "source": {
+                    "type": "base64",
+                    "media_type": mime,
+                    "data": base64.b64encode(imagem_bytes).decode("ascii"),
+                }},
+            ],
+        }],
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+    }
+    try:
+        resp = httpx.post(url, headers=headers, json=payload, timeout=TIMEOUT_SEGUNDOS)
+    except httpx.HTTPError as exc:
+        raise ValueError(f"Falha de rede no OCR: {exc}") from exc
+    if resp.status_code != 200:
+        raise ValueError(f"OCR recusado (HTTP {resp.status_code}): {resp.text[:300]}")
+    try:
+        corpo = resp.json()
+        texto = "".join(b.get("text", "") for b in corpo.get("content", []) if b.get("type") == "text")
+        return texto, resp.text
+    except (KeyError, IndexError, ValueError) as exc:
+        raise ValueError(f"Resposta inesperada do OCR: {resp.text[:300]}") from exc
+
+
+def _extrair_claude(
+    imagem_bytes: bytes,
+    mime: str,
+    ano: int,
+    nomes_conhecidos: list[str] | None = None,
+) -> dict:
+    texto, raw = _chamar_claude(imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos, multiplos=False)
+    try:
+        return _normalizar(_extrair_lista_json(texto)[0])
+    except ValueError as exc:
+        raise ValueError(f"Resposta inesperada do OCR: {raw[:300]}") from exc
+
+
 def _extrair_muse(
     imagem_bytes: bytes,
     mime: str,
@@ -405,8 +471,11 @@ def extrair_recibo(
     estiver configurado e ValueError se a API falhar ou responder mal.
     """
     ano = _ano_padrao(ano)
-    if provedor() == "gemini":
+    p = provedor()
+    if p == "gemini":
         return _extrair_gemini(imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos)
+    if p == "claude":
+        return _extrair_claude(imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos)
     return _extrair_muse(imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos)
 
 
@@ -418,8 +487,11 @@ def extrair_recibos(
 ) -> list[dict]:
     """Le uma foto ou pagina escaneada com 1 ou varios recibos e devolve lista normalizada."""
     ano = _ano_padrao(ano)
-    if provedor() == "gemini":
+    p = provedor()
+    if p == "gemini":
         texto, raw = _chamar_gemini(imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos, multiplos=True)
+    elif p == "claude":
+        texto, raw = _chamar_claude(imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos, multiplos=True)
     else:
         texto, raw = _chamar_muse(imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos, multiplos=True)
     try:
