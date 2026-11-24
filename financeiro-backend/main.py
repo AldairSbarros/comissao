@@ -15,6 +15,13 @@ import os
 import shutil
 from fastapi import UploadFile, File
 
+# Carregar variáveis do .env antes de importar módulos que as usam
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import crud, models, schemas, security
 import importador
 import planilha

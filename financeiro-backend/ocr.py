@@ -29,7 +29,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT_SEGUNDOS = 60
+TIMEOUT_SEGUNDOS = 300
 MAX_NOMES_CONHECIDOS = 150
 _ROMANOS_CONGREGACAO = {
     "IX": "9",
@@ -40,7 +40,7 @@ _ROMANOS_CONGREGACAO = {
 
 
 def provedor() -> str:
-    return os.environ.get("OCR_PROVIDER", "muse").strip().lower()
+    return os.environ.get("OCR_PROVIDER", "gpt-6.1-sol").strip().lower()
 
 
 def ocr_disponivel() -> bool:
@@ -459,6 +459,85 @@ def _ano_padrao(ano: int | None) -> int:
     return ano
 
 
+
+
+def _chamar_claude(
+    imagem_bytes: bytes,
+    mime: str,
+    ano: int,
+    nomes_conhecidos: list[str] | None = None,
+    multiplos: bool = False,
+) -> tuple[str, httpx.Response]:
+    """Chama Claude Sonnet 5 (API compatível com Anthropic /messages)."""
+    api_key = os.environ.get("CLAUDE_SS_API_KEY")
+    base_url = os.environ.get("CLAUDE_SS_BASE_URL", "https://claude-ss.ia.br/v1")
+    modelo = os.environ.get("OCR_CLAUDE_MODEL", "claude-sonnet-5")
+
+    imagem_b64 = base64.b64encode(imagem_bytes).decode("utf-8")
+    mime_extraido = mime.split("/")[-1] if "/" in mime else mime
+
+    payload = {
+        "model": modelo,
+        "max_tokens": 2000,
+        "system": _prompt(ano, nomes_conhecidos=nomes_conhecidos, multiplos=multiplos),
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": f"image/{mime_extraido}",
+                            "data": imagem_b64,
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+
+    url = base_url.rstrip("/") + "/messages"
+    resp = httpx.post(url, headers=headers, json=payload, timeout=TIMEOUT_SEGUNDOS)
+
+    try:
+        corpo = resp.json()
+    except Exception:
+        corpo = {}
+
+    texto = ""
+    if "content" in corpo:
+        for bloco in corpo["content"]:
+            if bloco.get("type") == "text":
+                texto += bloco.get("text", "")
+
+    if resp.status_code != 200 or not texto:
+        raise ValueError(
+            f"Claude falhou (status {resp.status_code}): {texto or corpo}"
+        )
+
+    return texto, resp
+
+
+def _extrair_claude(
+    imagem_bytes: bytes,
+    mime: str = "image/png",
+    ano: int | None = None,
+    nomes_conhecidos: list[str] | None = None,
+) -> dict:
+    ano = _ano_padrao(ano)
+    texto, _raw = _chamar_claude(
+        imagem_bytes, mime, ano, nomes_conhecidos=nomes_conhecidos, multiplos=False
+    )
+    return _normalizar(_extrair_json(texto))
+
+
 def extrair_recibo(
     imagem_bytes: bytes,
     mime: str = "image/png",
@@ -498,3 +577,6 @@ def extrair_recibos(
         return [_normalizar(item) for item in _extrair_lista_json(texto)]
     except ValueError as exc:
         raise ValueError(f"Resposta inesperada do OCR: {raw[:300]}") from exc
+
+
+

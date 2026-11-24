@@ -11,6 +11,8 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - OCR_PROVIDER=${OCR_PROVIDER:-gemini}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - CLAUDE_SS_API_KEY=${CLAUDE_SS_API_KEY:-}
+      - CLAUDE_SS_BASE_URL=${CLAUDE_SS_BASE_URL:-}
       - OCR_GEMINI_MODEL=${OCR_GEMINI_MODEL:-gemini-2.0-flash}
       - MODEL_API_KEY=${MODEL_API_KEY:-}
       - META_API_URL=${META_API_URL:-https://api.meta.ai/v1}
